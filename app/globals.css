@@ -179,6 +179,74 @@ body {
   z-index: 1;
 }
 
+.rin-quiet-gift {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(252, 248, 236, 0.95) 0%,
+      rgba(247, 240, 221, 0.92) 100%
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 251, 240, 0.52),
+    0 14px 28px rgba(61, 53, 39, 0.1);
+}
+
+.rin-quiet-gift::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 14px;
+  bottom: 14px;
+  width: 8px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(205, 181, 121, 0.06) 0%,
+    rgba(171, 144, 83, 0.2) 46%,
+    rgba(205, 181, 121, 0.08) 100%
+  );
+  box-shadow:
+    inset -1px 0 1px rgba(255, 248, 229, 0.5),
+    inset 1px 0 1px rgba(121, 99, 58, 0.1);
+}
+
+.rin-quiet-gift::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(125, 107, 76, 0.06) 1px, transparent 1px),
+    radial-gradient(rgba(122, 107, 76, 0.06) 0.6px, transparent 0.7px);
+  background-size:
+    100% 32px,
+    4px 4px;
+  background-position:
+    0 18px,
+    0 0;
+  opacity: 0.24;
+  z-index: 0;
+}
+
+.rin-quiet-gift > * {
+  position: relative;
+  z-index: 1;
+}
+
+.rin-quiet-gift-quote {
+  font-family:
+    "Iowan Old Style",
+    "Baskerville",
+    "Times New Roman",
+    ui-serif,
+    serif;
+  letter-spacing: 0.01em;
+}
+
 @keyframes rin-prep-breathe {
   0% {
     opacity: 0.42;
@@ -352,19 +420,23 @@ body {
 @keyframes rin-countdown-pop {
   0% {
     opacity: 0;
-    transform: scale(0.98);
+    transform: translateY(6px) scale(0.98);
+    filter: blur(1.8px);
   }
   25% {
     opacity: 1;
-    transform: scale(1.02);
+    transform: translateY(-1px) scale(1.02);
+    filter: blur(0.2px);
   }
   72% {
     opacity: 0.92;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
   100% {
     opacity: 0;
-    transform: scale(1);
+    transform: translateY(-2px) scale(1);
+    filter: blur(1.2px);
   }
 }
 

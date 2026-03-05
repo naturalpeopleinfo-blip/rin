@@ -128,10 +128,7 @@ export default function RitualPage() {
   const bottomChamberPercent = ritualProgressRatio * 100;
   const sessionLabel = paused ? "Paused" : running ? "In session" : "Ready";
   const isDoneEnabled = timer === 0 && !doneToday;
-  const canManualNext = !controlsLocked && currentStepIndex < STEPS.length - 1 && timer > 0;
   const currentStep = STEPS[currentStepIndex];
-  const rawNextStep = currentStepIndex < STEPS.length - 1 ? STEPS[currentStepIndex + 1] : null;
-  const nextStep = rawNextStep ?? null;
   const isImagineStep = currentStep.title === "IMAGINE";
 
   useSpotlight(ritualCardRef);
@@ -282,14 +279,6 @@ export default function RitualPage() {
     setPaused(false);
   };
 
-  const handleNextStep = () => {
-    if (!canManualNext) {
-      return;
-    }
-    const nextElapsed = cumulativeDurations[currentStepIndex];
-    setTimer(Math.max(0, TOTAL_SECONDS - nextElapsed));
-  };
-
   const handleReset = () => {
     clearCountdown();
     setRunning(false);
@@ -336,33 +325,31 @@ export default function RitualPage() {
         </section>
 
         {showPreparation ? (
-          <section className="rin-prep-bloom relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 shadow-sm md:p-10">
+          <section className="rin-quiet-gift relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 p-8 shadow-sm md:p-10">
             <p className="text-center text-xs uppercase tracking-[0.24em] text-[var(--rin-muted)]">
-              Preparation
+              Quiet Gift
+            </p>
+            <p className="mt-2 text-center text-sm tracking-[0.08em] text-[var(--rin-muted)]">
+              今日の静かな贈りもの
             </p>
 
-            <div className="mt-8 rounded-xl border border-[var(--rin-gold)]/45 bg-[var(--rin-gold-soft)]/10 px-6 py-7 md:px-8">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--rin-muted)]">
-                QUOTE
+            <blockquote className="mt-8 rounded-xl border border-[var(--rin-gold)]/35 bg-white/34 px-6 py-7 md:px-8">
+              <p className="rin-quiet-gift-quote text-base leading-[1.95] md:text-lg">
+                “{INTRO_QUOTE.english}”
               </p>
-              <blockquote className="mt-4 border-y border-[var(--rin-gold)]/30 py-5">
-                <p className="text-base leading-[1.9] md:text-lg">
-                  “{INTRO_QUOTE.english}”
-                </p>
-                <p className="mt-5 text-sm leading-[1.9] text-[var(--rin-muted)] md:text-[15px]">
-                  「{INTRO_QUOTE.japanese}」
-                </p>
-                <p className="mt-5 text-xs tracking-[0.08em] text-[var(--rin-muted)] md:text-sm">
-                  {INTRO_QUOTE.author} / {INTRO_QUOTE.role}
-                </p>
-              </blockquote>
-            </div>
+              <p className="mt-5 text-sm leading-[1.9] text-[var(--rin-muted)] md:text-[15px]">
+                「{INTRO_QUOTE.japanese}」
+              </p>
+              <p className="mt-5 text-xs tracking-[0.08em] text-[var(--rin-muted)]/90 md:text-sm">
+                {INTRO_QUOTE.author} / {INTRO_QUOTE.role}
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--rin-text)]/90">
+                この一行を胸に、リチュアルへ。
+              </p>
+            </blockquote>
 
-            <div className="mt-6 rounded-xl border border-[var(--rin-gold)]/45 bg-[var(--rin-gold-soft)]/10 px-6 py-7 md:px-8">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--rin-muted)]">
-                PREP
-              </p>
-              <p className="mt-4 text-base leading-[1.8] text-[var(--rin-text)]">
+            <div className="mt-6 rounded-xl border border-[var(--rin-gold)]/35 bg-white/26 px-6 py-7 md:px-8">
+              <p className="text-sm tracking-[0.14em] text-[var(--rin-muted)] md:text-base">
                 整える
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-relaxed text-[var(--rin-text)] md:text-base">
@@ -370,7 +357,10 @@ export default function RitualPage() {
                 <li>・深呼吸をひとつ。</li>
               </ul>
               <p className="mt-4 text-sm leading-relaxed text-[var(--rin-muted)] md:text-base">
-                香水でも、お茶でも、あなたの落ち着くものをそっと手元に。
+                香水でも、お茶でも。あなたが落ち着く香りを、そっと手元に。
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--rin-text)]/90">
+                準備ができたら、BEGIN。
               </p>
             </div>
 
@@ -384,7 +374,7 @@ export default function RitualPage() {
                 BEGIN
               </button>
               <p className="text-sm tracking-[0.08em] text-[var(--rin-muted)]">
-                3分のRitualへ進みます
+                3分のセッションへ進みます
               </p>
             </div>
           </section>
@@ -403,24 +393,26 @@ export default function RitualPage() {
                   <span className="rin-imagine-bloom-haze" />
                 </div>
               ) : null}
-              <div className="relative mt-3" data-resettable>
+              <div className="relative mt-3 min-h-[5rem] md:min-h-[5.6rem]" data-resettable>
                 {controlsLocked ? (
-                  <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center">
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
                     <p
                       key={countdownValue}
-                      className="rin-countdown-pop text-[4.1rem] font-semibold tracking-[0.12em] text-[var(--rin-text)] md:text-[4.6rem]"
+                      className="rin-countdown-pop text-[4.1rem] font-semibold tracking-[0.12em] text-[var(--rin-text)] md:text-[4.8rem]"
                     >
                       {countdownValue}
                     </p>
                   </div>
                 ) : null}
-                <p
-                  className={`text-6xl font-semibold tabular-nums transition-all duration-500 ${
-                    timerSettling ? "rin-timer-settle" : ""
-                  }`}
-                >
-                  {formatTimer(timer)}
-                </p>
+                {!controlsLocked ? (
+                  <p
+                    className={`text-6xl font-semibold tabular-nums transition-all duration-500 ${
+                      timerSettling ? "rin-timer-settle" : ""
+                    }`}
+                  >
+                    {formatTimer(timer)}
+                  </p>
+                ) : null}
               </div>
               <p className="mt-2 text-sm tracking-[0.08em] text-[var(--rin-muted)] transition-all duration-500" data-resettable>
                 {sessionLabel} ·{" "}
@@ -452,32 +444,25 @@ export default function RitualPage() {
                   </div>
                 </div>
               </div>
-              <div className="mt-7 flex justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={running ? handlePause : handleResume}
-                  disabled={controlsLocked || timer === 0}
-                  className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 transition-all duration-300 disabled:cursor-not-allowed disabled:bg-[var(--rin-gold-soft)]/55 disabled:text-[var(--rin-muted)] disabled:shadow-none"
-                >
-                  {running ? "Pause" : "Resume"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  disabled={controlsLocked}
-                  className="rounded-full border border-[var(--rin-gold)] px-6 py-2 transition-colors duration-300"
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  disabled={!canManualNext}
-                  className="rounded-full border border-[var(--rin-gold)]/70 px-4 py-1.5 text-xs tracking-[0.08em] text-[var(--rin-muted)] transition-colors duration-300 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  Next
-                </button>
-              </div>
+              {!controlsLocked ? (
+                <div className="mt-7 flex justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={running ? handlePause : handleResume}
+                    disabled={timer === 0}
+                    className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 transition-all duration-300 disabled:cursor-not-allowed disabled:bg-[var(--rin-gold-soft)]/55 disabled:text-[var(--rin-muted)] disabled:shadow-none"
+                  >
+                    {running ? "Pause" : "Resume"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="rounded-full border border-[var(--rin-gold)] px-6 py-2 transition-colors duration-300"
+                  >
+                    Reset
+                  </button>
+                </div>
+              ) : null}
 
               <div
                 className={`mt-7 rounded-xl border bg-[var(--rin-gold-soft)]/20 p-4 text-left transition-all duration-200 ${
@@ -494,16 +479,6 @@ export default function RitualPage() {
                   {currentStep.instruction}
                 </p>
               </div>
-              {nextStep ? (
-                <div className="mt-6 rounded-xl border border-[var(--rin-gold)]/45 bg-[var(--rin-gold-soft)]/10 p-4 text-left opacity-80">
-                  <p className="text-xs tracking-[0.18em] text-[var(--rin-muted)]">
-                    NEXT · {nextStep.title}
-                  </p>
-                  <p className="mt-2 whitespace-pre-line text-xs text-[var(--rin-muted)]/90 md:text-sm">
-                    {nextStep.instruction}
-                  </p>
-                </div>
-              ) : null}
               <div className="mt-8 flex flex-col items-center gap-3 pb-2">
                 <p className="text-[11px] tracking-[0.14em] text-[var(--rin-muted)]/85">
                   {currentStepIndex + 1}/{STEPS.length}
