@@ -226,82 +226,76 @@ export default function RitualPage() {
           <p>継続 {progress.streak}日 / 記録 {progress.points}</p>
         </header>
 
+        <section className="text-center">
+          <h1 className="text-5xl font-medium tracking-[0.15em] md:text-6xl">RIN.</h1>
+          <p className="mt-3 text-base tracking-[0.08em] text-[var(--rin-muted)] md:text-lg">
+            {todayDisplay} / Day {day}
+          </p>
+        </section>
+
+        <section
+          ref={ritualCardRef}
+          className="rin-spotlight rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 text-center shadow-sm"
+        >
+          <p className="text-xs tracking-[0.14em] text-[var(--rin-muted)]">
+            Today&apos;s Theme
+          </p>
+          <p className="mt-2 text-3xl font-medium leading-relaxed">{todaysTheme}</p>
+          <p className="mt-3 text-xs tracking-[0.1em] text-[var(--rin-muted)]">
+            Quiet Direction for Today
+          </p>
+        </section>
+
         {showPreparation ? (
-          <>
-            <section className="text-center">
-              <h1 className="text-5xl font-medium tracking-[0.15em] md:text-6xl">RIN.</h1>
-              <p className="mt-3 text-base tracking-[0.08em] text-[var(--rin-muted)] md:text-lg">
-                {todayDisplay} / Day {day}
+          <section className="rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 shadow-sm md:p-10">
+            <p className="text-center text-xs uppercase tracking-[0.24em] text-[var(--rin-muted)]">
+              Preparation
+            </p>
+
+            <div className="mt-8 rounded-xl border border-[var(--rin-gold)]/45 bg-[var(--rin-gold-soft)]/10 px-6 py-7 md:px-8">
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--rin-muted)]">
+                Quote
               </p>
-            </section>
-
-            <section
-              ref={ritualCardRef}
-              className="rin-spotlight rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 text-center shadow-sm"
-            >
-              <p className="text-xs uppercase tracking-[0.24em] text-[var(--rin-muted)]">
-                Preparation
-              </p>
-
-              <div className="mt-8">
-                <p className="text-xs tracking-[0.14em] text-[var(--rin-muted)]">
-                  Today&apos;s Theme
-                </p>
-                <p className="mt-2 text-3xl font-medium">{todaysTheme}</p>
-                <p className="mt-2 text-xs tracking-[0.1em] text-[var(--rin-muted)]">
-                  Quiet Direction for Today
-                </p>
-              </div>
-
-              <blockquote className="mx-auto mt-10 max-w-2xl">
-                <p className="text-lg leading-relaxed md:text-xl">
+              <blockquote className="mt-4">
+                <p className="text-lg leading-[1.85] md:text-xl">
                   “{INTRO_QUOTE.english}”
                 </p>
-                <p className="mt-4 text-sm leading-relaxed text-[var(--rin-muted)] md:text-base">
+                <p className="mt-5 text-sm leading-[1.9] text-[var(--rin-muted)] md:text-base">
                   「{INTRO_QUOTE.japanese}」
                 </p>
-                <p className="mt-4 text-sm tracking-[0.08em] text-[var(--rin-muted)]">
+                <p className="mt-5 text-sm tracking-[0.08em] text-[var(--rin-muted)] md:text-base">
                   {INTRO_QUOTE.author} / {INTRO_QUOTE.role}
                 </p>
               </blockquote>
+            </div>
 
-              <p className="mx-auto mt-8 max-w-xl text-sm tracking-[0.06em] text-[var(--rin-muted)] md:text-base">
-                好きな香りをひと吹き。空気を整える合図に。
+            <div className="mt-6 rounded-xl border border-[var(--rin-gold)]/45 bg-[var(--rin-gold-soft)]/10 px-6 py-7 md:px-8">
+              <p className="text-sm tracking-[0.14em] text-[var(--rin-muted)] md:text-base">
+                空気を整える
               </p>
+              <p className="mt-4 text-sm leading-[1.95] text-[var(--rin-text)] md:text-base">
+                香水なら1プッシュ。キャンドルなら火を灯す。お茶でもいい。好きな香りを、ひとつ近くに置く。
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--rin-muted)] md:text-base">
+                準備が整ったら、BEGIN。
+              </p>
+            </div>
 
-              <div className="mt-10 flex flex-col items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleBeginRitual}
-                  className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-12 py-3 text-sm tracking-[0.2em] transition hover:bg-[var(--rin-gold-soft)]/80"
-                >
-                  BEGIN
-                </button>
-                <p className="text-xs tracking-[0.08em] text-[var(--rin-muted)]">
-                  3分のリチュアルを始めます
-                </p>
-              </div>
-            </section>
-          </>
+            <div className="mt-10 flex flex-col items-center gap-3">
+              <button
+                type="button"
+                onClick={handleBeginRitual}
+                className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-12 py-3 text-sm tracking-[0.2em] transition hover:bg-[var(--rin-gold-soft)]/80"
+              >
+                BEGIN
+              </button>
+              <p className="text-sm tracking-[0.08em] text-[var(--rin-muted)]">
+                3分のリチュアルを始めます
+              </p>
+            </div>
+          </section>
         ) : (
           <>
-            <section className="text-center">
-              <h1 className="text-5xl font-medium tracking-[0.15em] md:text-6xl">RIN.</h1>
-              <p className="mt-3 text-base tracking-[0.08em] text-[var(--rin-muted)] md:text-lg">
-                {todayDisplay} / Day {day}
-              </p>
-            </section>
-
-            <section
-              ref={ritualCardRef}
-              className="rin-spotlight rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 text-center shadow-sm"
-            >
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--rin-muted)]">
-                Today&apos;s Theme
-              </p>
-              <p className="mt-2 text-2xl font-medium">{todaysTheme}</p>
-            </section>
-
             <section
               className={`rin-ritual-card relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 text-center transition-[box-shadow,opacity,transform,filter] duration-500 ${
                 running
