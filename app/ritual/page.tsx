@@ -1,20 +1,15 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toPng } from "html-to-image";
 import { getJstDateString, getYesterdayJstDateString } from "@/lib/date";
 import { incrementDay, loadDay } from "@/lib/day";
 import { isOnboarded } from "@/lib/onboarding";
 import { loadProgress, saveProgress, type Progress } from "@/lib/progress";
 import { useRinSfx } from "@/lib/useRinSfx";
-import { useSpotlight } from "@/lib/useSpotlight";
-import RinSealCard from "@/app/components/RinSealCard";
-import HourglassProgress from "@/app/components/HourglassProgress";
+import BreathRing from "@/app/components/BreathRing";
 
-const STEP_DURATIONS = [20, 30, 30, 60, 40] as const;
+const STEP_DURATIONS = [20, 30, 30, 25, 25, 25, 25] as const;
 const TOTAL_SECONDS = STEP_DURATIONS.reduce((sum, value) => sum + value, 0);
 const TOTAL_DAYS = 66;
 const THEMES = [
@@ -29,41 +24,55 @@ const THEMES = [
   "今日の自分が整う",
   "“私”に戻る",
 ];
-const COMPLETION_MESSAGES = [
-  "Today, you chose grace.",
-  "Quietly, you leveled up.",
-  "Keep the room within you.",
-  "The day is yours, again.",
-  "Carry this calm with you.",
-] as const;
 const STEPS = [
   {
-    title: "GROUND",
-    instruction: "椅子に深く座る。足裏を床に置く。肩をゆるめる。",
+    title: "RESET",
+    instruction:
+      "今をリセット。\n椅子に座り、足裏を床へ。\n肩の力を抜き、ゆっくり呼吸する。",
   },
   {
     title: "BREATHE",
-    instruction: "4秒吸う。6秒吐く。これを2回。",
+    instruction:
+      "呼吸。\n鼻から吸って、ゆっくり吐く。\nもう一度、空気を整える。",
   },
   {
     title: "IMAGINE",
-    instruction: "今日のテーマを静かに読む。\nその状態の自分の目元を想像する。",
+    instruction:
+      "空気をイメージする。\n静かなラウンジの扉を開けて、中に入る。\nその落ち着いた空気を、自分の周りにも作る。",
+  },
+  {
+    title: "BECOME",
+    instruction:
+      "役に入る。\n今日選んだ自分を、先に演じてみる。\n人は演じた役に近づいていく。",
   },
   {
     title: "DECLARE",
     instruction:
-      "1) 小さく唱える: 「私は、選ばれる。」を3回。\n2) リズム動作: 胸を上から下へ、ゆっくり撫で下ろす ×2回。\n3) イメージ: 選ばれる所作が整った自分を、10〜15秒で1カットだけ想像する。",
+      "言葉を置く。\n「私は、余裕がある」と静かに言う。\nもう一度、「私は、選ばれる人だ」。",
   },
   {
-    title: "INTEGRATE",
-    instruction: "今日の一歩をひとつ決める。\n自分をひとつ褒める。",
+    title: "MOVE",
+    instruction: "行動。\n背筋を伸ばし、ゆっくり立つ。\n一歩だけ前へ進む。",
   },
+  {
+    title: "SWITCH",
+    instruction: "リズムを切り替える。\n胸をトン、もう一度トン。\n静かに「よし。」と言う。",
+  },
+] as const;
+const NEXT_ACTION_HINTS = [
+  "呼吸を静かに重ねる",
+  "ラウンジの空気を思い描く",
+  "今日選ぶ役を先に演じる",
+  "言葉を短く宣言する",
+  "姿勢と一歩で整える",
+  "胸をトンと2回、スイッチする",
+  null,
 ] as const;
 const INTRO_QUOTE = {
   english: "Elegance is when the inside is as beautiful as the outside.",
   japanese: "エレガンスとは、内面が外見と同じように美しいこと。",
   author: "ココ・シャネル",
-  role: "ファッションデザイナー",
+  role: "デザイナー",
 } as const;
 const SEAL_QUOTE = {
   author_en: "Coco Chanel",
@@ -71,12 +80,6 @@ const SEAL_QUOTE = {
   quote_en: INTRO_QUOTE.english,
   quote_jp: INTRO_QUOTE.japanese,
 } as const;
-
-function pickRandomMessage(): string {
-  return COMPLETION_MESSAGES[
-    Math.floor(Math.random() * COMPLETION_MESSAGES.length)
-  ];
-}
 
 function formatTokyoDate(date = new Date()): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -93,6 +96,8 @@ function formatTimer(totalSeconds: number): string {
   const seconds = totalSeconds % 60;
   return `${String(minutes)}:${String(seconds).padStart(2, "0")}`;
 }
+
+const COUNTDOWN_TICK_MS = 1300;
 
 export default function RitualPage() {
   const router = useRouter();
@@ -112,31 +117,34 @@ export default function RitualPage() {
   const [todaysTheme] = useState(
     () => THEMES[Math.floor(Math.random() * THEMES.length)],
   );
-  const [completionMessage, setCompletionMessage] = useState(() => pickRandomMessage());
-  const [startCueVisible, setStartCueVisible] = useState(false);
-  const [stepFlash, setStepFlash] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [timerSettling, setTimerSettling] = useState(false);
-  const [showSeal, setShowSeal] = useState(false);
-  const [sealDay, setSealDay] = useState<number | null>(null);
-  const [canShareSeal, setCanShareSeal] = useState(false);
-  const [isSavingSeal, setIsSavingSeal] = useState(false);
-  const [isSharingSeal, setIsSharingSeal] = useState(false);
-  const [journeyDay, setJourneyDay] = useState(1);
-  const startCueFadeTimerRef = useRef<number | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [displayedStepIndex, setDisplayedStepIndex] = useState(0);
+  const [stepTransitionState, setStepTransitionState] = useState<"idle" | "out" | "in">("idle");
+  const [journeyDay] = useState(() => {
+    if (typeof window === "undefined") {
+      return 1;
+    }
+    const storedDay = window.localStorage.getItem("rin_day");
+    const parsedDay = Number.parseInt(storedDay ?? "1", 10);
+    if (!Number.isNaN(parsedDay) && parsedDay > 0) {
+      return Math.min(parsedDay, TOTAL_DAYS);
+    }
+    window.localStorage.setItem("rin_day", "1");
+    return 1;
+  });
   const resetTimerRef = useRef<number | null>(null);
-  const countdownTimerRef = useRef<number | null>(null);
-  const timerSettleRef = useRef<number | null>(null);
-  const previousStepIndexRef = useRef<number | null>(null);
+  const countdownTimeoutRef = useRef<number | null>(null);
+  const completeTransitionRef = useRef<number | null>(null);
+  const stepOutRef = useRef<number | null>(null);
+  const stepInRef = useRef<number | null>(null);
+  const stepIdleRef = useRef<number | null>(null);
   const completionTriggeredRef = useRef(false);
-  const sealCardRef = useRef<HTMLDivElement | null>(null);
-  const ritualCardRef = useRef<HTMLElement | null>(null);
   const { playStart, playTransition } = useRinSfx();
 
   const today = getJstDateString();
   const todayDisplay = useMemo(() => formatTokyoDate(), []);
   const yesterday = getYesterdayJstDateString();
-  const doneToday = progress.lastCompletedDate === today;
   const elapsed = TOTAL_SECONDS - timer;
   const controlsLocked = countdownValue !== null;
   const cumulativeDurations = STEP_DURATIONS.reduce<number[]>((acc, duration) => {
@@ -146,52 +154,18 @@ export default function RitualPage() {
   }, []);
   const stepIndex = cumulativeDurations.findIndex((value) => elapsed < value);
   const currentStepIndex = stepIndex === -1 ? STEPS.length - 1 : Math.max(stepIndex, 0);
-  const currentStepStartSeconds =
-    currentStepIndex === 0 ? 0 : cumulativeDurations[currentStepIndex - 1];
-  const currentStepElapsed = Math.max(0, elapsed - currentStepStartSeconds);
-  const currentStepRemaining = Math.max(
-    0,
-    STEP_DURATIONS[currentStepIndex] - currentStepElapsed,
-  );
   const ritualProgressRatio = Math.min(1, Math.max(0, elapsed / TOTAL_SECONDS));
-  const sessionLabel = paused ? "Paused" : running ? "In ritual" : "Ready";
-  const isDoneEnabled = timer === 0 && !doneToday;
   const currentStep = STEPS[currentStepIndex];
-  const isImagineStep = currentStep.title === "IMAGINE";
-  const nextActionVisible = ritualProgressRatio >= 0.6 && !controlsLocked && timer > 0;
-  const nextActionLabel = ritualProgressRatio >= 0.82 ? "Reflection" : "Quiet Writing";
-
-  useSpotlight(ritualCardRef);
+  const displayedStep = STEPS[displayedStepIndex];
+  const displayedInstruction = displayedStep.instruction.replace(/\n+/g, " ");
+  const isBreatheStep = (currentStep.title || "").toUpperCase().includes("BREATHE");
+  const nextActionLabel = NEXT_ACTION_HINTS[currentStepIndex];
 
   useEffect(() => {
     if (!isOnboarded()) {
       router.replace("/onboarding");
     }
   }, [router]);
-
-  useEffect(() => {
-    if (typeof navigator === "undefined") {
-      return;
-    }
-    const shareAvailable =
-      typeof navigator.share === "function" &&
-      typeof navigator.canShare === "function";
-    setCanShareSeal(shareAvailable);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const storedDay = window.localStorage.getItem("rin_day");
-    const parsedDay = Number.parseInt(storedDay ?? "1", 10);
-    if (!Number.isNaN(parsedDay) && parsedDay > 0) {
-      setJourneyDay(Math.min(parsedDay, TOTAL_DAYS));
-      return;
-    }
-    window.localStorage.setItem("rin_day", "1");
-    setJourneyDay(1);
-  }, []);
 
   useEffect(() => {
     if (!running) {
@@ -213,28 +187,6 @@ export default function RitualPage() {
   }, [running]);
 
   useEffect(() => {
-    const previous = previousStepIndexRef.current;
-    previousStepIndexRef.current = currentStepIndex;
-    if (previous === null || previous === currentStepIndex) {
-      return;
-    }
-
-    let flashTimer: number | null = null;
-    const flashStartTimer = window.setTimeout(() => {
-      setStepFlash(true);
-      flashTimer = window.setTimeout(() => {
-        setStepFlash(false);
-      }, 200);
-    }, 0);
-    return () => {
-      window.clearTimeout(flashStartTimer);
-      if (flashTimer !== null) {
-        window.clearTimeout(flashTimer);
-      }
-    };
-  }, [currentStepIndex]);
-
-  useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const onChange = (event: MediaQueryListEvent) => {
       setPrefersReducedMotion(event.matches);
@@ -247,106 +199,103 @@ export default function RitualPage() {
 
   useEffect(() => {
     return () => {
-      if (startCueFadeTimerRef.current !== null) {
-        window.clearTimeout(startCueFadeTimerRef.current);
-      }
       if (resetTimerRef.current !== null) {
         window.clearTimeout(resetTimerRef.current);
       }
-      if (countdownTimerRef.current !== null) {
-        window.clearInterval(countdownTimerRef.current);
+      if (countdownTimeoutRef.current !== null) {
+        window.clearTimeout(countdownTimeoutRef.current);
       }
-      if (timerSettleRef.current !== null) {
-        window.clearTimeout(timerSettleRef.current);
+      if (completeTransitionRef.current !== null) {
+        window.clearTimeout(completeTransitionRef.current);
+      }
+      if (stepOutRef.current !== null) {
+        window.clearTimeout(stepOutRef.current);
+      }
+      if (stepInRef.current !== null) {
+        window.clearTimeout(stepInRef.current);
+      }
+      if (stepIdleRef.current !== null) {
+        window.clearTimeout(stepIdleRef.current);
       }
     };
   }, []);
 
-  const triggerStartCue = () => {
-    if (startCueFadeTimerRef.current !== null) {
-      window.clearTimeout(startCueFadeTimerRef.current);
-    }
-    setStartCueVisible(true);
-    startCueFadeTimerRef.current = window.setTimeout(() => {
-      setStartCueVisible(false);
-    }, 6000);
-  };
-
-  const applyCompletionProgress = useCallback(() => {
-    if (doneToday) {
+  useEffect(() => {
+    if (showPreparation || displayedStepIndex === currentStepIndex) {
       return;
     }
-    const nextStreak =
-      progress.lastCompletedDate === yesterday ? progress.streak + 1 : 1;
-    const nextProgress: Progress = {
-      streak: nextStreak,
-      points: progress.points + 2,
-      lastCompletedDate: today,
+    stepOutRef.current = window.setTimeout(() => {
+      setStepTransitionState("out");
+    }, 0);
+    stepInRef.current = window.setTimeout(() => {
+      setDisplayedStepIndex(currentStepIndex);
+      setStepTransitionState("in");
+    }, prefersReducedMotion ? 0 : 660);
+    stepIdleRef.current = window.setTimeout(() => {
+      setStepTransitionState("idle");
+    }, prefersReducedMotion ? 0 : 1640);
+    return () => {
+      if (stepOutRef.current !== null) {
+        window.clearTimeout(stepOutRef.current);
+      }
+      if (stepInRef.current !== null) {
+        window.clearTimeout(stepInRef.current);
+      }
+      if (stepIdleRef.current !== null) {
+        window.clearTimeout(stepIdleRef.current);
+      }
     };
-    const nextDay = incrementDay();
-    saveProgress(nextProgress);
-    setProgress(nextProgress);
-    setDay(nextDay);
-    setCompletionMessage(pickRandomMessage());
-  }, [doneToday, progress.lastCompletedDate, progress.points, progress.streak, today, yesterday]);
+  }, [currentStepIndex, displayedStepIndex, prefersReducedMotion, showPreparation]);
 
   const clearCountdown = () => {
-    if (countdownTimerRef.current !== null) {
-      window.clearInterval(countdownTimerRef.current);
-      countdownTimerRef.current = null;
+    if (countdownTimeoutRef.current !== null) {
+      window.clearTimeout(countdownTimeoutRef.current);
+      countdownTimeoutRef.current = null;
     }
     setCountdownValue(null);
   };
 
   const startWithCountdown = () => {
-    if (prefersReducedMotion) {
-      clearCountdown();
-      playTransition();
-      setRunning(true);
-      setPaused(false);
-      triggerStartCue();
+    clearCountdown();
+    setTimer(TOTAL_SECONDS);
+    setRunning(false);
+    setPaused(false);
+    setCountdownValue(5);
+  };
+
+  useEffect(() => {
+    if (countdownValue === null) {
       return;
     }
-    clearCountdown();
-    setRunning(false);
-    setCountdownValue(5);
-    countdownTimerRef.current = window.setInterval(() => {
+    countdownTimeoutRef.current = window.setTimeout(() => {
       setCountdownValue((prev) => {
         if (prev === null) {
           return null;
         }
         if (prev <= 1) {
-          clearCountdown();
           playTransition();
+          setTimer(TOTAL_SECONDS);
           setRunning(true);
           setPaused(false);
-          triggerStartCue();
-          setTimerSettling(true);
-          if (timerSettleRef.current !== null) {
-            window.clearTimeout(timerSettleRef.current);
-          }
-          timerSettleRef.current = window.setTimeout(() => {
-            setTimerSettling(false);
-          }, 460);
           return null;
         }
         return prev - 1;
       });
-    }, 1800);
-  };
-
-  const handleComplete = () => {
-    if (!isDoneEnabled) {
-      return;
-    }
-    applyCompletionProgress();
-  };
+    }, prefersReducedMotion ? 1000 : COUNTDOWN_TICK_MS);
+    return () => {
+      if (countdownTimeoutRef.current !== null) {
+        window.clearTimeout(countdownTimeoutRef.current);
+      }
+    };
+  }, [countdownValue, playTransition, prefersReducedMotion]);
 
   const handleBeginRitual = () => {
     playStart();
     setShowPreparation(false);
+    setTimer(TOTAL_SECONDS);
+    setDisplayedStepIndex(0);
+    setStepTransitionState("idle");
     completionTriggeredRef.current = false;
-    setShowSeal(false);
     startWithCountdown();
   };
 
@@ -370,8 +319,6 @@ export default function RitualPage() {
     clearCountdown();
     setRunning(false);
     setPaused(false);
-    setTimerSettling(false);
-    setShowSeal(false);
     completionTriggeredRef.current = false;
     setTimer(TOTAL_SECONDS);
     setResetting(true);
@@ -383,58 +330,6 @@ export default function RitualPage() {
     }, 360);
   };
 
-  const getSealPng = async (): Promise<string> => {
-    if (!sealCardRef.current) {
-      throw new Error("seal card not ready");
-    }
-    return toPng(sealCardRef.current, {
-      pixelRatio: 2,
-      backgroundColor: "#f4efe3",
-      cacheBust: true,
-    });
-  };
-
-  const sealFilename = `RIN-Day-${String(sealDay ?? day).padStart(2, "0")}.png`;
-
-  const handleSaveSeal = async () => {
-    if (isSavingSeal) {
-      return;
-    }
-    setIsSavingSeal(true);
-    try {
-      const dataUrl = await getSealPng();
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = sealFilename;
-      link.click();
-    } finally {
-      setIsSavingSeal(false);
-    }
-  };
-
-  const handleShareSeal = async () => {
-    if (!canShareSeal || isSharingSeal) {
-      return;
-    }
-    setIsSharingSeal(true);
-    try {
-      const dataUrl = await getSealPng();
-      const blob = await fetch(dataUrl).then((response) => response.blob());
-      const file = new File([blob], sealFilename, { type: "image/png" });
-      if (!navigator.canShare({ files: [file] })) {
-        setCanShareSeal(false);
-        return;
-      }
-      await navigator.share({
-        title: "RIN",
-        text: "",
-        files: [file],
-      });
-    } finally {
-      setIsSharingSeal(false);
-    }
-  };
-
   useEffect(() => {
     if (
       showPreparation ||
@@ -444,311 +339,190 @@ export default function RitualPage() {
     ) {
       return;
     }
-    completionTriggeredRef.current = true;
-    setRunning(false);
-    setPaused(false);
-    setSealDay(day);
-    applyCompletionProgress();
-    setShowSeal(true);
-  }, [applyCompletionProgress, controlsLocked, day, showPreparation, timer]);
+    const completeNow = window.setTimeout(() => {
+      completionTriggeredRef.current = true;
+      setRunning(false);
+      setPaused(false);
+      const nextStreak =
+        progress.lastCompletedDate === yesterday ? progress.streak + 1 : 1;
+      const nextProgress: Progress = {
+        streak: nextStreak,
+        points: progress.points + 2,
+        lastCompletedDate: today,
+      };
+      const nextDay = incrementDay();
+      saveProgress(nextProgress);
+      setProgress(nextProgress);
+      setDay(nextDay);
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          "rin_share_payload",
+          JSON.stringify({
+            theme: todaysTheme,
+            day,
+            quote: SEAL_QUOTE,
+            streak: nextProgress.streak,
+            points: nextProgress.points,
+          }),
+        );
+      }
+
+      setIsCompleting(true);
+      completeTransitionRef.current = window.setTimeout(
+        () => router.push("/share"),
+        prefersReducedMotion ? 0 : 760,
+      );
+    }, 0);
+    return () => window.clearTimeout(completeNow);
+  }, [
+    controlsLocked,
+    day,
+    prefersReducedMotion,
+    progress.lastCompletedDate,
+    progress.points,
+    progress.streak,
+    router,
+    showPreparation,
+    timer,
+    today,
+    todaysTheme,
+    yesterday,
+  ]);
 
   return (
-    <main className="min-h-screen bg-[var(--rin-bg)] px-6 py-10 text-[var(--rin-text)]">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
-        <header className="flex items-center justify-between text-sm text-[var(--rin-muted)]">
-          <Link href="/" className="hover:underline">
-            ← Lobby
-          </Link>
-          {showPreparation || showSeal ? (
-            <p>継続 {progress.streak}日 / 記録 {progress.points}</p>
-          ) : (
-            <span aria-hidden className="opacity-0">
-              継続 00日 / 記録 00
-            </span>
-          )}
+    <main
+      className={`h-[100svh] min-h-[100svh] overflow-hidden overscroll-none bg-[var(--rin-bg)] text-[var(--rin-text)] transition-opacity duration-[800ms] ease-in-out ${
+        isCompleting ? "opacity-0" : "opacity-100"
+      }`}
+    >
+      <div className="mx-auto flex h-full w-full max-w-md flex-col px-4 pt-3.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <header className="shrink-0 rounded-xl border border-[var(--rin-gold)]/50 bg-[color:rgba(255,251,241,0.72)] px-3 py-2 text-[10px] tracking-[0.07em] text-[var(--rin-muted)]">
+          <div className="flex items-center justify-between">
+            <p>{todayDisplay}</p>
+            <p>Day {journeyDay}/{TOTAL_DAYS}</p>
+          </div>
+          <div className="mt-2.5 text-center">
+            <div className="mx-auto max-w-[340px] rounded-xl border border-[var(--rin-gold)]/38 bg-[var(--rin-paper)] px-4 py-2.5 shadow-[0_2px_6px_rgba(0,0,0,0.05)]">
+              <p className="text-[16px] tracking-[0.055em] text-[var(--rin-text)]">
+                Theme：{todaysTheme}
+              </p>
+            </div>
+          </div>
         </header>
 
-        <section className="text-center">
-          <h1 className="text-5xl font-medium tracking-[0.15em] md:text-6xl">RIN</h1>
-          <p className="mt-3 text-base tracking-[0.08em] text-[var(--rin-muted)] md:text-lg">
-            {todayDisplay} / Day {day}
-          </p>
-        </section>
-
-        <section
-          ref={ritualCardRef}
-          className="rin-spotlight card-page page-transition rounded-2xl border border-[var(--rin-gold)]/60 p-8 text-center shadow-sm"
-        >
-          <p className="text-xs tracking-[0.14em] text-[var(--rin-muted)]">
-            Today&apos;s Theme
-          </p>
-          <p className="mt-2 text-3xl font-medium leading-relaxed">{todaysTheme}</p>
-          <p className="mt-3 text-xs tracking-[0.1em] text-[var(--rin-muted)]">
-            Quiet Direction for Today
-          </p>
-        </section>
-
-        {showPreparation ? (
-          <section className="rin-quiet-gift card-page page-transition relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 p-8 shadow-sm md:p-10">
-            <div className="flex justify-center">
-              <Image
-                src="/illustrations/feather.svg"
-                alt=""
-                aria-hidden
-                width={42}
-                height={42}
-                className="opacity-70"
-              />
-            </div>
-            <p className="text-center text-xs uppercase tracking-[0.24em] text-[var(--rin-muted)]">
-              Quiet Gift
-            </p>
-            <p className="mt-2 text-center text-sm tracking-[0.08em] text-[var(--rin-muted)]">
-              今日の静かな贈りもの
-            </p>
-            <div className="section-divider" />
-
-            <blockquote className="rin-quiet-gift-paper card-page mt-8 rounded-xl px-7 py-9 md:px-10 md:py-10">
-              <p className="rin-quiet-gift-quote text-lg leading-[1.95] italic md:text-xl">
-                “{INTRO_QUOTE.english}”
-              </p>
-              <p className="mt-5 text-sm leading-[1.9] text-[var(--rin-muted)] md:text-[15px]">
-                「{INTRO_QUOTE.japanese}」
-              </p>
-              <p className="mt-6 text-[11px] tracking-[0.11em] text-[var(--rin-muted)]/82 md:text-xs">
-                {INTRO_QUOTE.author}（{INTRO_QUOTE.role}）
-              </p>
-            </blockquote>
-
-            <div className="card-page mt-6 rounded-xl border border-[var(--rin-gold)]/35 bg-white/26 px-6 py-7 md:px-8">
-              <div className="flex items-center justify-center gap-2">
-                <Image
-                  src="/illustrations/botanical.svg"
-                  alt=""
-                  aria-hidden
-                  width={28}
-                  height={28}
-                  className="opacity-75"
-                />
-                <span className="text-[10px] tracking-[0.2em] text-[var(--rin-muted)]">✦</span>
-              </div>
-              <p className="text-sm tracking-[0.14em] text-[var(--rin-muted)] md:text-base">
-                整える
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-[var(--rin-text)]">
-                好きな香りをひと吹き。今日はこの言葉を胸に置いて始めましょう。
-              </p>
-              <ul className="mt-3 space-y-2 text-sm leading-relaxed text-[var(--rin-text)] md:text-base">
-                <li>・香りを1プッシュ。</li>
-                <li>・深呼吸をひとつ。</li>
-              </ul>
-              <p className="mt-4 text-sm leading-relaxed text-[var(--rin-muted)] md:text-base">
-                香水でも、お茶でも。あなたが落ち着く香りを、そっと手元に。
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-[var(--rin-text)]/90">
-                準備ができたら、BEGIN。
+        <section className="flex flex-1 min-h-0 flex-col items-center justify-center px-2 py-2">
+          {showPreparation ? (
+            <div className="w-full text-center">
+              <p className="text-[10px] tracking-[0.22em] text-[var(--rin-muted)]">QUIET GIFT</p>
+              <article className="rin-quiet-gift-sheet mx-auto mt-3 w-full max-w-[22.5rem] px-5 py-6 text-center">
+                <p className="rin-quiet-gift-quote text-xs leading-[1.55] italic text-[var(--rin-muted)]/78">
+                  “{INTRO_QUOTE.english}”
+                </p>
+                <p className="mt-3 text-[1.03rem] leading-[1.8] text-[var(--rin-text)]">
+                  「{INTRO_QUOTE.japanese}」
+                </p>
+                <p className="mt-3 text-[11px] leading-relaxed text-[var(--rin-muted)]">
+                  {INTRO_QUOTE.author} <span className="text-[10px] text-[var(--rin-muted)]/82">（{INTRO_QUOTE.role}）</span>
+                </p>
+              </article>
+              <p className="mt-2.5 whitespace-pre-line text-[11px] leading-[1.65] tracking-[0.04em] text-[var(--rin-muted)]/90">
+                {"この言葉を合図に、呼吸と“香り”で朝を整えます。\n香水をひと押し。コーヒーでも、お茶でも。\nあなたが落ち着く香りをそっと手元に。準備できたらBEGIN。"}
               </p>
             </div>
-
-            <div className="mt-10 flex flex-col items-center gap-3">
-              <button
-                type="button"
-                onClick={handleBeginRitual}
-                disabled={controlsLocked}
-                className="rin-begin-button rounded-full border border-[var(--rin-gold)] px-12 py-3 text-sm tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rin-gold)]/65 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--rin-bg)]"
+          ) : (
+            <div className="flex w-full flex-1 min-h-0 flex-col items-center justify-center text-center">
+              <div
+                className={`rin-step-shell w-full ${
+                  stepTransitionState === "out"
+                    ? "is-out"
+                    : stepTransitionState === "in"
+                      ? "is-in"
+                      : "is-idle"
+                }`}
               >
-                BEGIN
-              </button>
-              <p className="text-sm tracking-[0.08em] text-[var(--rin-muted)]">
-                3分のリチュアルへ進みます
+                <p className="rin-step-meta text-[11px] tracking-[0.1em] text-[var(--rin-muted)]/88">
+                  Step {displayedStepIndex + 1}/{STEPS.length}
+                </p>
+                <p className="rin-step-label mt-1 text-[10px] tracking-[0.2em] text-[var(--rin-muted)]">
+                  {displayedStep.title}
+                </p>
+                <p className="rin-ritual-copy mx-auto mt-2.5 text-[var(--rin-text)]">
+                  {displayedInstruction}
+                </p>
+              </div>
+              <div className="relative z-[2] mt-3.5 flex min-h-[12.5rem] items-center justify-center">
+                <BreathRing
+                  timeLabel={formatTimer(timer)}
+                  countdownValue={countdownValue}
+                  progress={ritualProgressRatio}
+                  mode={isBreatheStep ? "breathe" : "ambient"}
+                  active={running && !paused && timer > 0 && !controlsLocked}
+                  paused={paused || controlsLocked}
+                />
+              </div>
+            </div>
+          )}
+        </section>
+
+        <footer className="shrink-0 pt-1">
+          <section
+            className={`mx-auto w-full max-w-[22.5rem] rounded-2xl border border-[var(--rin-gold)]/60 bg-[color:rgba(251,247,236,0.86)] p-3 shadow-sm transition-[opacity,transform,filter] duration-[2000ms] ease-out ${
+              resetting ? "rin-resetting" : ""
+            }`}
+          >
+            <div
+              className={`transition-[opacity,transform] ease-in-out ${
+                controlsLocked
+                  ? "pointer-events-none translate-y-2 opacity-0"
+                  : "translate-y-0 opacity-100"
+              } ${prefersReducedMotion ? "duration-0" : "duration-[600ms]"}`}
+            >
+              <p
+                className={`text-center text-[11px] tracking-[0.04em] text-[var(--rin-muted)]/90 transition-opacity duration-[1200ms] ${
+                  nextActionLabel && !showPreparation ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {nextActionLabel ? `NEXT: ${nextActionLabel}` : ""}
               </p>
+
+              <div className="mt-2.5 flex w-full min-h-[2.25rem] items-center justify-center">
+                {showPreparation ? (
+                  <button
+                    type="button"
+                    onClick={handleBeginRitual}
+                    disabled={controlsLocked}
+                    className="rin-begin-button rounded-full border border-[var(--rin-gold)] px-10 py-2 text-xs tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rin-gold)]/65 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--rin-bg)]"
+                  >
+                    BEGIN
+                  </button>
+                ) : (
+                  <div className="flex w-full justify-center">
+                    <div className="inline-flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={running ? handlePause : handleResume}
+                        disabled={timer === 0 || controlsLocked}
+                        className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/45 px-5 py-1.5 text-[11px] tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {running ? "Pause" : "Resume"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleReset}
+                        disabled={controlsLocked}
+                        className="rounded-full border border-[var(--rin-gold)] px-5 py-1.5 text-[11px] tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
-        ) : (
-          <>
-            <section
-              className={`rin-ritual-card card-page page-transition relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 p-8 text-center transition-[box-shadow,opacity,transform,filter] duration-500 ${
-                running && !controlsLocked
-                  ? "shadow-[0_14px_30px_rgba(61,53,39,0.12)]"
-                  : "shadow-sm"
-              } ${resetting ? "rin-resetting" : ""}`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Image
-                  src="/illustrations/moon.svg"
-                  alt=""
-                  aria-hidden
-                  width={26}
-                  height={26}
-                  className="opacity-75"
-                />
-                <span className="text-[10px] tracking-[0.2em] text-[var(--rin-muted)]">✦</span>
-              </div>
-              {isImagineStep ? (
-                <div aria-hidden className="rin-imagine-bloom">
-                  <span className="rin-imagine-bloom-core" />
-                  <span className="rin-imagine-bloom-haze" />
-                </div>
-              ) : null}
-              <p className="mt-4 text-[11px] uppercase tracking-[0.16em] text-[var(--rin-gold)]/65 md:text-xs">
-                Day {journeyDay} / {TOTAL_DAYS}
-              </p>
-              <div className="relative mt-3 min-h-[5rem] md:min-h-[5.6rem]" data-resettable>
-                {controlsLocked ? (
-                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-                    <p
-                      key={countdownValue}
-                      className="rin-countdown-pop text-[4.1rem] font-semibold tracking-[0.12em] text-[var(--rin-text)] md:text-[4.8rem]"
-                    >
-                      {countdownValue}
-                    </p>
-                  </div>
-                ) : null}
-                {!controlsLocked ? (
-                  <p
-                    className={`text-6xl font-semibold tabular-nums transition-all duration-500 ${
-                      timerSettling ? "rin-timer-settle" : ""
-                    }`}
-                  >
-                    {formatTimer(timer)}
-                  </p>
-                ) : null}
-              </div>
-              {!controlsLocked ? (
-                <>
-                  <p className="mt-2 text-sm tracking-[0.08em] text-[var(--rin-muted)] transition-all duration-500" data-resettable>
-                    {sessionLabel} ·{" "}
-                    <span className="font-medium text-[var(--rin-text)]">
-                      {formatTimer(currentStepRemaining)}
-                    </span>
-                  </p>
-                  <p
-                    className={`mt-2 min-h-[1rem] text-xs tracking-[0.08em] text-[var(--rin-muted)] transition-opacity duration-500 ${
-                      startCueVisible || (paused && !controlsLocked) ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
-                    {paused && !controlsLocked ? "Paused" : "今から3分。“私”に戻る。"}
-                  </p>
-                  <div className="mt-6 flex justify-center" data-resettable>
-                    <HourglassProgress progress={ritualProgressRatio} />
-                  </div>
-                  <p
-                    className={`rin-next-action-hint mt-3 text-center text-xs italic tracking-[0.06em] text-[var(--rin-gold)] transition-[opacity,filter] duration-[2000ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                      nextActionVisible ? "opacity-45 blur-0" : "opacity-0 blur-[1px]"
-                    }`}
-                  >
-                    Next: {nextActionLabel}
-                  </p>
-                  <div className="mt-7 flex justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={running ? handlePause : handleResume}
-                      disabled={timer === 0}
-                      className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 transition-all duration-300 disabled:cursor-not-allowed disabled:bg-[var(--rin-gold-soft)]/55 disabled:text-[var(--rin-muted)] disabled:shadow-none"
-                    >
-                      {running ? "Pause" : "Resume"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      className="rounded-full border border-[var(--rin-gold)] px-6 py-2 transition-colors duration-300"
-                    >
-                      Reset
-                    </button>
-                  </div>
-
-                  <div
-                    className={`mt-7 rounded-xl border bg-[var(--rin-gold-soft)]/20 p-4 text-left transition-all duration-200 ${
-                      stepFlash
-                        ? "border-[var(--rin-gold)] shadow-sm"
-                        : "border-[var(--rin-gold)]/60"
-                    }`}
-                    data-resettable
-                  >
-                    <p className="text-xs tracking-[0.18em] text-[var(--rin-muted)]">
-                      {currentStep.title}
-                    </p>
-                    <p className="mt-3 whitespace-pre-line text-sm font-medium text-[var(--rin-text)] md:text-base">
-                      {currentStep.instruction}
-                    </p>
-                  </div>
-                  <div className="mt-8 flex flex-col items-center gap-3 pb-2">
-                    <p className="text-[11px] tracking-[0.14em] text-[var(--rin-muted)]/85">
-                      {currentStepIndex + 1}/{STEPS.length}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleComplete}
-                      disabled={!isDoneEnabled || controlsLocked || showSeal}
-                      className={`rounded-full border px-12 py-3 text-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                        isDoneEnabled
-                          ? "border-[var(--rin-gold)] bg-[var(--rin-gold)] text-[var(--rin-text)] shadow-sm"
-                          : "border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/70"
-                      }`}
-                    >
-                      DONE
-                    </button>
-                    {doneToday ? (
-                      <p className="text-sm text-[var(--rin-muted)]">
-                        {completionMessage}
-                      </p>
-                    ) : null}
-                  </div>
-                </>
-              ) : (
-                <p className="mt-6 text-xs tracking-[0.12em] text-[var(--rin-muted)]/80">
-                  Ritual starts in...
-                </p>
-              )}
-            </section>
-          </>
-        )}
+        </footer>
       </div>
-      {showSeal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgba(34,29,21,0.36)] p-6 backdrop-blur-[4px]">
-          <div className="w-full max-w-lg">
-            <RinSealCard
-              ref={sealCardRef}
-              theme={todaysTheme}
-              day={sealDay ?? day}
-              quote={SEAL_QUOTE}
-            />
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleSaveSeal}
-                disabled={isSavingSeal}
-                className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 text-sm tracking-[0.08em] transition hover:bg-[var(--rin-gold-soft)]/80 disabled:opacity-60"
-              >
-                {isSavingSeal ? "Saving..." : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={handleShareSeal}
-                disabled={!canShareSeal || isSharingSeal}
-                className="rounded-full border border-[var(--rin-gold)] px-6 py-2 text-sm tracking-[0.08em] transition hover:bg-[var(--rin-gold-soft)]/18 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {isSharingSeal ? "Sharing..." : "Share"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowSeal(false)}
-                className="rounded-full border border-[var(--rin-gold)]/65 px-6 py-2 text-sm tracking-[0.08em] text-[var(--rin-muted)] transition hover:bg-[var(--rin-gold-soft)]/16"
-              >
-                Close
-              </button>
-            </div>
-            {!canShareSeal ? (
-              <p className="mt-2 text-center text-xs text-[var(--rin-muted)]">
-                Share is unavailable in this browser.
-              </p>
-            ) : null}
-            <p className="mt-4 text-center text-xs tracking-[0.11em] text-[var(--rin-muted)]/90">
-              継続 {progress.streak}日 / 記録 {progress.points}
-            </p>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }

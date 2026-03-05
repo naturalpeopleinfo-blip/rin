@@ -50,7 +50,9 @@ export default function OnboardingFlow() {
           {showHowItWorks ? (
             <div className="rin-hero-rise mx-auto mt-4 max-w-md rounded-xl border border-[var(--rin-gold)]/45 bg-white/42 px-5 py-4 text-left">
               <p className="text-sm leading-relaxed text-[var(--rin-muted)]">
-                毎朝、ThemeとQuiet Giftを受け取り、香りで空気を整えてから静かに始めます。
+                この言葉を合図に、呼吸と“香り”で朝を整えます。
+                香水をひと押し。コーヒーでも、お茶でも。
+                あなたが落ち着く香りをそっと手元に。準備できたらBEGIN。
               </p>
             </div>
           ) : null}
