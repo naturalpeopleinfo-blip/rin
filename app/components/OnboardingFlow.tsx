@@ -11,10 +11,10 @@ type Slide = {
   timingText?: string;
 };
 
-const BASE_SECONDS = 2.2;
-const SECONDS_PER_CHARACTER = 0.12;
-const MIN_SECONDS = 3.5;
-const MAX_SECONDS = 9;
+const BASE_SECONDS = 3.0;
+const SECONDS_PER_CHARACTER = 0.14;
+const MIN_SECONDS = 4.5;
+const MAX_SECONDS = 11;
 
 function clamp(min: number, max: number, value: number): number {
   return Math.min(Math.max(value, min), max);
@@ -32,7 +32,6 @@ function getSlideDurationMs(text: string): number {
 export default function OnboardingFlow() {
   const router = useRouter();
   const [index, setIndex] = useState(0);
-  const [showMirrorNote, setShowMirrorNote] = useState(false);
 
   const slides: Slide[] = useMemo(
     () => [
@@ -47,17 +46,10 @@ export default function OnboardingFlow() {
         timingText: "凛は、巡る。66 Morning Rituals",
       },
       {
-        id: "voice",
-        canAutoAdvance: true,
-        timingText:
-          "これは 朝の小さな儀式です。一日、三分。六十六日かけて 空気を整えていきます。This is a small morning ritual. 3 minutes a day. 66 days to refine your air.",
-      },
-      {
         id: "door",
-        canAutoAdvance: true,
+        canAutoAdvance: false,
         timingText: "最初の七日間は 静かな準備です。その先には もう一つの扉があります。",
       },
-      { id: "day1" },
     ].map((slide) => ({
       ...slide,
       autoAdvanceMs:
@@ -143,28 +135,14 @@ export default function OnboardingFlow() {
               </>
             ) : null}
 
-            {slides[index]?.id === "voice" ? (
-              <>
-                <div className="mb-8 h-24 w-24 rounded-full border border-[var(--rin-gold)]/60" />
-                <p className="whitespace-pre-line text-xl leading-relaxed tracking-[0.05em] md:text-2xl">
-                  {"これは 朝の小さな儀式です。\n一日、三分。\n六十六日かけて 空気を整えていきます。"}
-                </p>
-                <p className="mt-6 max-w-lg text-xs tracking-[0.04em] text-[var(--rin-muted)] md:text-sm">
-                  This is a small morning ritual. 3 minutes a day. 66 days to refine your air.
-                </p>
-              </>
-            ) : null}
-
             {slides[index]?.id === "door" ? (
-              <p className="whitespace-pre-line text-xl leading-relaxed tracking-[0.05em] md:text-2xl">
-                {"最初の七日間は 静かな準備です。\nその先には もう一つの扉があります。"}
-              </p>
-            ) : null}
-
-            {slides[index]?.id === "day1" ? (
               <div onClick={(event) => event.stopPropagation()} className="w-full max-w-lg">
-                <p className="text-6xl font-semibold tracking-[0.12em] md:text-7xl">Day 1</p>
-                <p className="mt-4 text-2xl tracking-[0.08em] md:text-3xl">「空気をまとう」</p>
+                <p className="whitespace-pre-line text-xl leading-relaxed tracking-[0.05em] md:text-2xl">
+                  {"最初の七日間は 静かな準備です。\nその先には もう一つの扉があります。"}
+                </p>
+                <p className="mt-6 text-sm tracking-[0.08em] text-[var(--rin-muted)]">
+                  ゆっくり、始めましょう。
+                </p>
                 <div className="mt-10 flex flex-col gap-3">
                   <button
                     type="button"
@@ -173,19 +151,7 @@ export default function OnboardingFlow() {
                   >
                     Begin Ritual
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowMirrorNote((prev) => !prev)}
-                    className="rounded-full border border-[var(--rin-gold)] px-6 py-3 text-sm tracking-[0.1em] transition hover:bg-[var(--rin-gold-soft)]/20"
-                  >
-                    Mirror Mode
-                  </button>
                 </div>
-                {showMirrorNote ? (
-                  <p className="mt-4 text-sm text-[var(--rin-muted)]">
-                    Mirror Mode is coming soon.
-                  </p>
-                ) : null}
               </div>
             ) : null}
           </div>
