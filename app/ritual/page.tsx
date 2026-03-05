@@ -57,7 +57,6 @@ const INTRO_QUOTE = {
   author: "ココ・シャネル",
   role: "ファッションデザイナー",
 } as const;
-type RitualMode = "timed" | "self";
 
 function pickRandomMessage(): string {
   return COMPLETION_MESSAGES[
@@ -85,9 +84,8 @@ export default function RitualPage() {
   const [progress, setProgress] = useState<Progress>(() => loadProgress());
   const [timer, setTimer] = useState(TOTAL_SECONDS);
   const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [showPreparation, setShowPreparation] = useState(true);
-  const [mode, setMode] = useState<RitualMode>("timed");
-  const [selfStepIndex, setSelfStepIndex] = useState(0);
   const [countdownValue, setCountdownValue] = useState<number | null>(null);
   const [day, setDay] = useState(() => loadDay());
   const [todaysTheme] = useState(
@@ -97,9 +95,11 @@ export default function RitualPage() {
   const [startCueVisible, setStartCueVisible] = useState(false);
   const [stepFlash, setStepFlash] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [timerSettling, setTimerSettling] = useState(false);
   const startCueFadeTimerRef = useRef<number | null>(null);
   const resetTimerRef = useRef<number | null>(null);
   const countdownTimerRef = useRef<number | null>(null);
+  const timerSettleRef = useRef<number | null>(null);
   const previousStepIndexRef = useRef<number | null>(null);
   const ritualCardRef = useRef<HTMLElement | null>(null);
 
@@ -115,21 +115,20 @@ export default function RitualPage() {
     return acc;
   }, []);
   const stepIndex = cumulativeDurations.findIndex((value) => elapsed < value);
-  const timedStepIndex = stepIndex === -1 ? STEPS.length - 1 : Math.max(stepIndex, 0);
-  const currentStepIndex = mode === "timed" ? timedStepIndex : selfStepIndex;
+  const currentStepIndex = stepIndex === -1 ? STEPS.length - 1 : Math.max(stepIndex, 0);
   const currentStepStartSeconds =
-    timedStepIndex === 0 ? 0 : cumulativeDurations[timedStepIndex - 1];
+    currentStepIndex === 0 ? 0 : cumulativeDurations[currentStepIndex - 1];
   const currentStepElapsed = Math.max(0, elapsed - currentStepStartSeconds);
-  const timedStepRemaining = Math.max(
+  const currentStepRemaining = Math.max(
     0,
-    STEP_DURATIONS[timedStepIndex] - currentStepElapsed,
+    STEP_DURATIONS[currentStepIndex] - currentStepElapsed,
   );
-  const progressPercent = ((currentStepIndex + 1) / STEPS.length) * 100;
-  const isDoneEnabled =
-    mode === "timed"
-      ? timer === 0 && !doneToday
-      : selfStepIndex === STEPS.length - 1 && !doneToday;
-  const isStartDisabled = controlsLocked || running || timer === 0;
+  const ritualProgressRatio = Math.min(1, Math.max(0, elapsed / TOTAL_SECONDS));
+  const topChamberPercent = (1 - ritualProgressRatio) * 100;
+  const bottomChamberPercent = ritualProgressRatio * 100;
+  const sessionLabel = paused ? "Paused" : running ? "In session" : "Ready";
+  const isDoneEnabled = timer === 0 && !doneToday;
+  const canManualNext = !controlsLocked && currentStepIndex < STEPS.length - 1 && timer > 0;
   const currentStep = STEPS[currentStepIndex];
   const rawNextStep = currentStepIndex < STEPS.length - 1 ? STEPS[currentStepIndex + 1] : null;
   const nextStep = rawNextStep ?? null;
@@ -189,6 +188,9 @@ export default function RitualPage() {
       if (countdownTimerRef.current !== null) {
         window.clearInterval(countdownTimerRef.current);
       }
+      if (timerSettleRef.current !== null) {
+        window.clearTimeout(timerSettleRef.current);
+      }
     };
   }, []);
 
@@ -213,7 +215,7 @@ export default function RitualPage() {
   const startWithCountdown = () => {
     clearCountdown();
     setRunning(false);
-    setCountdownValue(3);
+    setCountdownValue(5);
     countdownTimerRef.current = window.setInterval(() => {
       setCountdownValue((prev) => {
         if (prev === null) {
@@ -222,12 +224,20 @@ export default function RitualPage() {
         if (prev <= 1) {
           clearCountdown();
           setRunning(true);
+          setPaused(false);
           triggerStartCue();
+          setTimerSettling(true);
+          if (timerSettleRef.current !== null) {
+            window.clearTimeout(timerSettleRef.current);
+          }
+          timerSettleRef.current = window.setTimeout(() => {
+            setTimerSettling(false);
+          }, 460);
           return null;
         }
         return prev - 1;
       });
-    }, 1000);
+    }, 850);
   };
 
   const handleComplete = () => {
@@ -251,34 +261,41 @@ export default function RitualPage() {
     setCompletionMessage(pickRandomMessage());
   };
 
-  const handleModeChange = (nextMode: RitualMode) => {
-    if (nextMode === mode) {
-      return;
-    }
-    clearCountdown();
-    setMode(nextMode);
-    setRunning(false);
-    setTimer(TOTAL_SECONDS);
-    setSelfStepIndex(0);
-  };
-
   const handleBeginRitual = () => {
     setShowPreparation(false);
     startWithCountdown();
   };
 
-  const handleSelfPacedNext = () => {
-    if (mode !== "self") {
+  const handlePause = () => {
+    if (!running) {
       return;
     }
-    setSelfStepIndex((prev) => Math.min(prev + 1, STEPS.length - 1));
+    setRunning(false);
+    setPaused(true);
+  };
+
+  const handleResume = () => {
+    if (running || timer === 0) {
+      return;
+    }
+    setRunning(true);
+    setPaused(false);
+  };
+
+  const handleNextStep = () => {
+    if (!canManualNext) {
+      return;
+    }
+    const nextElapsed = cumulativeDurations[currentStepIndex];
+    setTimer(Math.max(0, TOTAL_SECONDS - nextElapsed));
   };
 
   const handleReset = () => {
     clearCountdown();
     setRunning(false);
+    setPaused(false);
+    setTimerSettling(false);
     setTimer(TOTAL_SECONDS);
-    setSelfStepIndex(0);
     setResetting(true);
     if (resetTimerRef.current !== null) {
       window.clearTimeout(resetTimerRef.current);
@@ -318,35 +335,6 @@ export default function RitualPage() {
           </p>
         </section>
 
-        <section className="flex justify-center">
-          <div className="inline-flex rounded-full border border-[var(--rin-gold)]/65 bg-white/60 p-1">
-            <button
-              type="button"
-              onClick={() => handleModeChange("timed")}
-              disabled={controlsLocked}
-              className={`rounded-full px-4 py-1.5 text-xs tracking-[0.08em] transition ${
-                mode === "timed"
-                  ? "bg-[var(--rin-gold-soft)] text-[var(--rin-text)]"
-                  : "text-[var(--rin-muted)] hover:bg-[var(--rin-gold-soft)]/45"
-              } disabled:opacity-50`}
-            >
-              Timed
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModeChange("self")}
-              disabled={controlsLocked}
-              className={`rounded-full px-4 py-1.5 text-xs tracking-[0.08em] transition ${
-                mode === "self"
-                  ? "bg-[var(--rin-gold-soft)] text-[var(--rin-text)]"
-                  : "text-[var(--rin-muted)] hover:bg-[var(--rin-gold-soft)]/45"
-              } disabled:opacity-50`}
-            >
-              Self-paced
-            </button>
-          </div>
-        </section>
-
         {showPreparation ? (
           <section className="rin-prep-bloom relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 shadow-sm md:p-10">
             <p className="text-center text-xs uppercase tracking-[0.24em] text-[var(--rin-muted)]">
@@ -377,11 +365,12 @@ export default function RitualPage() {
               <p className="mt-4 text-base leading-[1.8] text-[var(--rin-text)]">
                 整える
               </p>
-              <p className="mt-3 text-sm leading-[1.95] text-[var(--rin-text)] md:text-base">
-                香りをひと吹き。手元に置いて、深呼吸をひとつ。
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-[var(--rin-muted)] md:text-base">
-                香水でも、お茶でも、あなたの落ち着くものを。
+              <ul className="mt-3 space-y-2 text-sm leading-relaxed text-[var(--rin-text)] md:text-base">
+                <li>・香りを1プッシュ。</li>
+                <li>・深呼吸をひとつ。</li>
+              </ul>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--rin-muted)] md:text-base">
+                香水でも、お茶でも、あなたの落ち着くものをそっと手元に。
               </p>
             </div>
 
@@ -403,7 +392,7 @@ export default function RitualPage() {
           <>
             <section
               className={`rin-ritual-card relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 text-center transition-[box-shadow,opacity,transform,filter] duration-500 ${
-                running
+                running && !controlsLocked
                   ? "shadow-[0_14px_30px_rgba(61,53,39,0.12)]"
                   : "shadow-sm"
               } ${resetting ? "rin-resetting" : ""}`}
@@ -414,67 +403,63 @@ export default function RitualPage() {
                   <span className="rin-imagine-bloom-haze" />
                 </div>
               ) : null}
-              <p className="mt-3 text-6xl font-semibold tabular-nums transition-all duration-500" data-resettable>
-                {formatTimer(timer)}
-              </p>
+              <div className="relative mt-3" data-resettable>
+                {controlsLocked ? (
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center">
+                    <p
+                      key={countdownValue}
+                      className="rin-countdown-pop text-[4.1rem] font-semibold tracking-[0.12em] text-[var(--rin-text)] md:text-[4.6rem]"
+                    >
+                      {countdownValue}
+                    </p>
+                  </div>
+                ) : null}
+                <p
+                  className={`text-6xl font-semibold tabular-nums transition-all duration-500 ${
+                    timerSettling ? "rin-timer-settle" : ""
+                  }`}
+                >
+                  {formatTimer(timer)}
+                </p>
+              </div>
               <p className="mt-2 text-sm tracking-[0.08em] text-[var(--rin-muted)] transition-all duration-500" data-resettable>
-                {mode === "timed" ? (
-                  <>
-                    Step {currentStepIndex + 1}/{STEPS.length} ·{" "}
-                    <span className="font-medium text-[var(--rin-text)]">
-                      {formatTimer(timedStepRemaining)}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    Step {currentStepIndex + 1}/{STEPS.length} · 目安残り{" "}
-                    <span className="font-medium text-[var(--rin-text)]">
-                      {formatTimer(timer)}
-                    </span>
-                  </>
-                )}
+                {sessionLabel} ·{" "}
+                <span className="font-medium text-[var(--rin-text)]">
+                  {formatTimer(currentStepRemaining)}
+                </span>
               </p>
               <p
                 className={`mt-2 min-h-[1rem] text-xs tracking-[0.08em] text-[var(--rin-muted)] transition-opacity duration-500 ${
-                  startCueVisible ? "opacity-100" : "opacity-0"
+                  startCueVisible || (paused && !controlsLocked) ? "opacity-100" : "opacity-0"
                 }`}
               >
-                今から3分。“私”に戻る。
+                {paused && !controlsLocked ? "Paused" : "今から3分。“私”に戻る。"}
               </p>
-              <div className="mt-5">
-                <div
-                  className="h-[12px] w-full rounded-full shadow-inner shadow-[color:rgba(61,53,39,0.14)] transition-all duration-500"
-                  data-resettable
-                  style={{
-                    background:
-                      "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, color-mix(in srgb, var(--rin-gold-soft) 80%, transparent) 56%, color-mix(in srgb, var(--rin-gold-soft) 90%, transparent) 100%)",
-                  }}
-                >
-                  <div
-                    className="relative h-full overflow-hidden rounded-full transition-[width] duration-300 ease-in-out"
-                    style={{
-                      width: `${progressPercent}%`,
-                      background:
-                        "linear-gradient(90deg, color-mix(in srgb, var(--rin-gold-soft) 38%, white) 0%, var(--rin-gold) 52%, color-mix(in srgb, var(--rin-gold) 82%, #b89c53) 100%)",
-                      boxShadow: "0 0 10px rgba(212, 190, 125, 0.18)",
-                    }}
-                  >
-                    <span className="rin-progress-topline" />
-                    {running ? <span className="rin-progress-glow" /> : null}
+              <div className="mt-6 flex justify-center" data-resettable>
+                <div className="rin-hourglass-pill">
+                  <div className="rin-hourglass-chamber rin-hourglass-top">
+                    <div
+                      className={`rin-hourglass-liquid ${running ? "rin-hourglass-flow" : ""}`}
+                      style={{ height: `${topChamberPercent}%` }}
+                    />
+                  </div>
+                  <div className="rin-hourglass-neck" />
+                  <div className="rin-hourglass-chamber rin-hourglass-bottom">
+                    <div
+                      className={`rin-hourglass-liquid ${running ? "rin-hourglass-flow" : ""}`}
+                      style={{ height: `${bottomChamberPercent}%` }}
+                    />
                   </div>
                 </div>
-                <p className="mt-2 text-center text-xs tracking-[0.08em] text-[var(--rin-muted)]">
-                  {currentStepIndex + 1} / {STEPS.length}
-                </p>
               </div>
-              <div className="mt-6 flex justify-center gap-3">
+              <div className="mt-7 flex justify-center gap-3">
                 <button
                   type="button"
-                  onClick={startWithCountdown}
-                  disabled={isStartDisabled}
+                  onClick={running ? handlePause : handleResume}
+                  disabled={controlsLocked || timer === 0}
                   className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 transition-all duration-300 disabled:cursor-not-allowed disabled:bg-[var(--rin-gold-soft)]/55 disabled:text-[var(--rin-muted)] disabled:shadow-none"
                 >
-                  {running ? "Running" : "Start"}
+                  {running ? "Pause" : "Resume"}
                 </button>
                 <button
                   type="button"
@@ -484,18 +469,14 @@ export default function RitualPage() {
                 >
                   Reset
                 </button>
-                {mode === "self" ? (
-                  <button
-                    type="button"
-                    onClick={handleSelfPacedNext}
-                    disabled={
-                      controlsLocked || !running || selfStepIndex === STEPS.length - 1
-                    }
-                    className="rounded-full border border-[var(--rin-gold)] px-6 py-2 transition-colors duration-300 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  disabled={!canManualNext}
+                  className="rounded-full border border-[var(--rin-gold)]/70 px-4 py-1.5 text-xs tracking-[0.08em] text-[var(--rin-muted)] transition-colors duration-300 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Next
+                </button>
               </div>
 
               <div
@@ -507,7 +488,7 @@ export default function RitualPage() {
                 data-resettable
               >
                 <p className="text-xs tracking-[0.18em] text-[var(--rin-muted)]">
-                  STEP {currentStepIndex + 1}/{STEPS.length} · {currentStep.title}
+                  {currentStep.title}
                 </p>
                 <p className="mt-3 whitespace-pre-line text-sm font-medium text-[var(--rin-text)] md:text-base">
                   {currentStep.instruction}
@@ -524,6 +505,9 @@ export default function RitualPage() {
                 </div>
               ) : null}
               <div className="mt-8 flex flex-col items-center gap-3 pb-2">
+                <p className="text-[11px] tracking-[0.14em] text-[var(--rin-muted)]/85">
+                  {currentStepIndex + 1}/{STEPS.length}
+                </p>
                 <button
                   type="button"
                   onClick={handleComplete}
@@ -546,13 +530,6 @@ export default function RitualPage() {
           </>
         )}
       </div>
-      {controlsLocked ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgba(244,239,227,0.72)] backdrop-blur-[1.5px]">
-          <p className="rin-countdown-pop text-7xl font-semibold tracking-[0.14em] text-[var(--rin-text)] md:text-8xl">
-            {countdownValue}
-          </p>
-        </div>
-      ) : null}
     </main>
   );
 }

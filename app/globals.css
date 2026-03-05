@@ -263,27 +263,128 @@ body {
     inset 0 1px 0 rgba(255, 252, 244, 0.5);
 }
 
+@keyframes rin-hourglass-flow {
+  0% {
+    filter: saturate(1) brightness(1);
+  }
+  50% {
+    filter: saturate(1.04) brightness(1.04);
+  }
+  100% {
+    filter: saturate(1) brightness(1);
+  }
+}
+
+.rin-hourglass-pill {
+  position: relative;
+  width: 20px;
+  height: 112px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--rin-gold) 64%, white);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 253, 246, 0.82) 0%,
+    rgba(247, 239, 214, 0.3) 48%,
+    rgba(255, 253, 246, 0.72) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 251, 238, 0.42),
+    0 8px 16px rgba(61, 53, 39, 0.08);
+  overflow: hidden;
+}
+
+.rin-hourglass-chamber {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: calc(50% - 5px);
+  overflow: hidden;
+}
+
+.rin-hourglass-top {
+  top: 2px;
+  border-radius: 999px 999px 8px 8px;
+}
+
+.rin-hourglass-bottom {
+  bottom: 2px;
+  border-radius: 8px 8px 999px 999px;
+}
+
+.rin-hourglass-neck {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: calc(50% - 2px);
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(238, 222, 178, 0.12) 0%,
+    rgba(232, 212, 160, 0.44) 50%,
+    rgba(238, 222, 178, 0.12) 100%
+  );
+  filter: blur(0.2px);
+}
+
+.rin-hourglass-liquid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(243, 227, 183, 0.18) 0%,
+    rgba(225, 199, 136, 0.58) 60%,
+    rgba(203, 172, 98, 0.56) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 250, 238, 0.3),
+    0 0 8px rgba(212, 190, 125, 0.22);
+  transition: height 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rin-hourglass-flow {
+  animation: rin-hourglass-flow 3.2s ease-in-out infinite;
+}
+
 @keyframes rin-countdown-pop {
   0% {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.98);
   }
-  20% {
+  25% {
     opacity: 1;
+    transform: scale(1.02);
+  }
+  72% {
+    opacity: 0.92;
     transform: scale(1);
-  }
-  80% {
-    opacity: 1;
-    transform: scale(1.03);
   }
   100% {
     opacity: 0;
-    transform: scale(0.94);
+    transform: scale(1);
   }
 }
 
 .rin-countdown-pop {
-  animation: rin-countdown-pop 920ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: rin-countdown-pop 820ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes rin-timer-settle {
+  0% {
+    opacity: 0.75;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rin-timer-settle {
+  animation: rin-timer-settle 420ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -310,9 +411,21 @@ body {
     transition: none;
   }
 
+  .rin-hourglass-liquid {
+    transition: none;
+  }
+
+  .rin-hourglass-flow {
+    animation: none;
+  }
+
   .rin-countdown-pop {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+
+  .rin-timer-settle {
+    animation: none;
   }
 }
