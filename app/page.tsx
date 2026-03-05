@@ -117,7 +117,7 @@ export default function LobbyPage() {
   return (
     <main className="min-h-screen bg-[var(--rin-bg)] px-6 text-[var(--rin-text)]">
       <section className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center text-center">
-        <h1 className="text-6xl font-medium tracking-[0.15em] md:text-7xl">RIN.</h1>
+        <h1 className="text-6xl font-medium tracking-[0.15em] md:text-7xl">RIN</h1>
         <div
           className="mt-6"
           onMouseEnter={() => setPaused(true)}

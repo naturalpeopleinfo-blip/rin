@@ -263,6 +263,29 @@ body {
     inset 0 1px 0 rgba(255, 252, 244, 0.5);
 }
 
+@keyframes rin-countdown-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+.rin-countdown-pop {
+  animation: rin-countdown-pop 920ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rin-progress-glow {
     animation: none;
@@ -285,5 +308,11 @@ body {
 
   .rin-begin-button {
     transition: none;
+  }
+
+  .rin-countdown-pop {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }

@@ -57,6 +57,7 @@ const INTRO_QUOTE = {
   author: "ココ・シャネル",
   role: "ファッションデザイナー",
 } as const;
+type RitualMode = "timed" | "self";
 
 function pickRandomMessage(): string {
   return COMPLETION_MESSAGES[
@@ -85,6 +86,9 @@ export default function RitualPage() {
   const [timer, setTimer] = useState(TOTAL_SECONDS);
   const [running, setRunning] = useState(false);
   const [showPreparation, setShowPreparation] = useState(true);
+  const [mode, setMode] = useState<RitualMode>("timed");
+  const [selfStepIndex, setSelfStepIndex] = useState(0);
+  const [countdownValue, setCountdownValue] = useState<number | null>(null);
   const [day, setDay] = useState(() => loadDay());
   const [todaysTheme] = useState(
     () => THEMES[Math.floor(Math.random() * THEMES.length)],
@@ -95,6 +99,7 @@ export default function RitualPage() {
   const [resetting, setResetting] = useState(false);
   const startCueFadeTimerRef = useRef<number | null>(null);
   const resetTimerRef = useRef<number | null>(null);
+  const countdownTimerRef = useRef<number | null>(null);
   const previousStepIndexRef = useRef<number | null>(null);
   const ritualCardRef = useRef<HTMLElement | null>(null);
 
@@ -103,23 +108,28 @@ export default function RitualPage() {
   const yesterday = getYesterdayJstDateString();
   const doneToday = progress.lastCompletedDate === today;
   const elapsed = TOTAL_SECONDS - timer;
+  const controlsLocked = countdownValue !== null;
   const cumulativeDurations = STEP_DURATIONS.reduce<number[]>((acc, duration) => {
     const previous = acc[acc.length - 1] ?? 0;
     acc.push(previous + duration);
     return acc;
   }, []);
   const stepIndex = cumulativeDurations.findIndex((value) => elapsed < value);
-  const currentStepIndex =
-    stepIndex === -1 ? STEPS.length - 1 : Math.max(stepIndex, 0);
+  const timedStepIndex = stepIndex === -1 ? STEPS.length - 1 : Math.max(stepIndex, 0);
+  const currentStepIndex = mode === "timed" ? timedStepIndex : selfStepIndex;
   const currentStepStartSeconds =
-    currentStepIndex === 0 ? 0 : cumulativeDurations[currentStepIndex - 1];
+    timedStepIndex === 0 ? 0 : cumulativeDurations[timedStepIndex - 1];
   const currentStepElapsed = Math.max(0, elapsed - currentStepStartSeconds);
-  const currentStepRemaining = Math.max(
+  const timedStepRemaining = Math.max(
     0,
-    STEP_DURATIONS[currentStepIndex] - currentStepElapsed,
+    STEP_DURATIONS[timedStepIndex] - currentStepElapsed,
   );
   const progressPercent = ((currentStepIndex + 1) / STEPS.length) * 100;
-  const isDoneEnabled = timer === 0 && !doneToday;
+  const isDoneEnabled =
+    mode === "timed"
+      ? timer === 0 && !doneToday
+      : selfStepIndex === STEPS.length - 1 && !doneToday;
+  const isStartDisabled = controlsLocked || running || timer === 0;
   const currentStep = STEPS[currentStepIndex];
   const rawNextStep = currentStepIndex < STEPS.length - 1 ? STEPS[currentStepIndex + 1] : null;
   const nextStep = rawNextStep ?? null;
@@ -176,6 +186,9 @@ export default function RitualPage() {
       if (resetTimerRef.current !== null) {
         window.clearTimeout(resetTimerRef.current);
       }
+      if (countdownTimerRef.current !== null) {
+        window.clearInterval(countdownTimerRef.current);
+      }
     };
   }, []);
 
@@ -189,8 +202,36 @@ export default function RitualPage() {
     }, 6000);
   };
 
+  const clearCountdown = () => {
+    if (countdownTimerRef.current !== null) {
+      window.clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    setCountdownValue(null);
+  };
+
+  const startWithCountdown = () => {
+    clearCountdown();
+    setRunning(false);
+    setCountdownValue(3);
+    countdownTimerRef.current = window.setInterval(() => {
+      setCountdownValue((prev) => {
+        if (prev === null) {
+          return null;
+        }
+        if (prev <= 1) {
+          clearCountdown();
+          setRunning(true);
+          triggerStartCue();
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   const handleComplete = () => {
-    if (doneToday || timer !== 0) {
+    if (!isDoneEnabled) {
       return;
     }
 
@@ -210,10 +251,41 @@ export default function RitualPage() {
     setCompletionMessage(pickRandomMessage());
   };
 
+  const handleModeChange = (nextMode: RitualMode) => {
+    if (nextMode === mode) {
+      return;
+    }
+    clearCountdown();
+    setMode(nextMode);
+    setRunning(false);
+    setTimer(TOTAL_SECONDS);
+    setSelfStepIndex(0);
+  };
+
   const handleBeginRitual = () => {
     setShowPreparation(false);
-    setRunning(true);
-    triggerStartCue();
+    startWithCountdown();
+  };
+
+  const handleSelfPacedNext = () => {
+    if (mode !== "self") {
+      return;
+    }
+    setSelfStepIndex((prev) => Math.min(prev + 1, STEPS.length - 1));
+  };
+
+  const handleReset = () => {
+    clearCountdown();
+    setRunning(false);
+    setTimer(TOTAL_SECONDS);
+    setSelfStepIndex(0);
+    setResetting(true);
+    if (resetTimerRef.current !== null) {
+      window.clearTimeout(resetTimerRef.current);
+    }
+    resetTimerRef.current = window.setTimeout(() => {
+      setResetting(false);
+    }, 360);
   };
 
   return (
@@ -227,7 +299,7 @@ export default function RitualPage() {
         </header>
 
         <section className="text-center">
-          <h1 className="text-5xl font-medium tracking-[0.15em] md:text-6xl">RIN.</h1>
+          <h1 className="text-5xl font-medium tracking-[0.15em] md:text-6xl">RIN</h1>
           <p className="mt-3 text-base tracking-[0.08em] text-[var(--rin-muted)] md:text-lg">
             {todayDisplay} / Day {day}
           </p>
@@ -244,6 +316,35 @@ export default function RitualPage() {
           <p className="mt-3 text-xs tracking-[0.1em] text-[var(--rin-muted)]">
             Quiet Direction for Today
           </p>
+        </section>
+
+        <section className="flex justify-center">
+          <div className="inline-flex rounded-full border border-[var(--rin-gold)]/65 bg-white/60 p-1">
+            <button
+              type="button"
+              onClick={() => handleModeChange("timed")}
+              disabled={controlsLocked}
+              className={`rounded-full px-4 py-1.5 text-xs tracking-[0.08em] transition ${
+                mode === "timed"
+                  ? "bg-[var(--rin-gold-soft)] text-[var(--rin-text)]"
+                  : "text-[var(--rin-muted)] hover:bg-[var(--rin-gold-soft)]/45"
+              } disabled:opacity-50`}
+            >
+              Timed
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange("self")}
+              disabled={controlsLocked}
+              className={`rounded-full px-4 py-1.5 text-xs tracking-[0.08em] transition ${
+                mode === "self"
+                  ? "bg-[var(--rin-gold-soft)] text-[var(--rin-text)]"
+                  : "text-[var(--rin-muted)] hover:bg-[var(--rin-gold-soft)]/45"
+              } disabled:opacity-50`}
+            >
+              Self-paced
+            </button>
+          </div>
         </section>
 
         {showPreparation ? (
@@ -288,6 +389,7 @@ export default function RitualPage() {
               <button
                 type="button"
                 onClick={handleBeginRitual}
+                disabled={controlsLocked}
                 className="rin-begin-button rounded-full border border-[var(--rin-gold)] px-12 py-3 text-sm tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rin-gold)]/65 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--rin-bg)]"
               >
                 BEGIN
@@ -316,10 +418,21 @@ export default function RitualPage() {
                 {formatTimer(timer)}
               </p>
               <p className="mt-2 text-sm tracking-[0.08em] text-[var(--rin-muted)] transition-all duration-500" data-resettable>
-                Step {currentStepIndex + 1}/{STEPS.length} ·{" "}
-                <span className="font-medium text-[var(--rin-text)]">
-                  {formatTimer(currentStepRemaining)}
-                </span>
+                {mode === "timed" ? (
+                  <>
+                    Step {currentStepIndex + 1}/{STEPS.length} ·{" "}
+                    <span className="font-medium text-[var(--rin-text)]">
+                      {formatTimer(timedStepRemaining)}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Step {currentStepIndex + 1}/{STEPS.length} · 目安残り{" "}
+                    <span className="font-medium text-[var(--rin-text)]">
+                      {formatTimer(timer)}
+                    </span>
+                  </>
+                )}
               </p>
               <p
                 className={`mt-2 min-h-[1rem] text-xs tracking-[0.08em] text-[var(--rin-muted)] transition-opacity duration-500 ${
@@ -357,32 +470,32 @@ export default function RitualPage() {
               <div className="mt-6 flex justify-center gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setRunning(true);
-                    triggerStartCue();
-                  }}
-                  disabled={running || timer === 0}
+                  onClick={startWithCountdown}
+                  disabled={isStartDisabled}
                   className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 transition-all duration-300 disabled:cursor-not-allowed disabled:bg-[var(--rin-gold-soft)]/55 disabled:text-[var(--rin-muted)] disabled:shadow-none"
                 >
                   {running ? "Running" : "Start"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setRunning(false);
-                    setTimer(TOTAL_SECONDS);
-                    setResetting(true);
-                    if (resetTimerRef.current !== null) {
-                      window.clearTimeout(resetTimerRef.current);
-                    }
-                    resetTimerRef.current = window.setTimeout(() => {
-                      setResetting(false);
-                    }, 360);
-                  }}
+                  onClick={handleReset}
+                  disabled={controlsLocked}
                   className="rounded-full border border-[var(--rin-gold)] px-6 py-2 transition-colors duration-300"
                 >
                   Reset
                 </button>
+                {mode === "self" ? (
+                  <button
+                    type="button"
+                    onClick={handleSelfPacedNext}
+                    disabled={
+                      controlsLocked || !running || selfStepIndex === STEPS.length - 1
+                    }
+                    className="rounded-full border border-[var(--rin-gold)] px-6 py-2 transition-colors duration-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                ) : null}
               </div>
 
               <div
@@ -414,7 +527,7 @@ export default function RitualPage() {
                 <button
                   type="button"
                   onClick={handleComplete}
-                  disabled={!isDoneEnabled}
+                  disabled={!isDoneEnabled || controlsLocked}
                   className={`rounded-full border px-12 py-3 text-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     isDoneEnabled
                       ? "border-[var(--rin-gold)] bg-[var(--rin-gold)] text-[var(--rin-text)] shadow-sm"
@@ -433,6 +546,13 @@ export default function RitualPage() {
           </>
         )}
       </div>
+      {controlsLocked ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgba(244,239,227,0.72)] backdrop-blur-[1.5px]">
+          <p className="rin-countdown-pop text-7xl font-semibold tracking-[0.14em] text-[var(--rin-text)] md:text-8xl">
+            {countdownValue}
+          </p>
+        </div>
+      ) : null}
     </main>
   );
 }
