@@ -7,9 +7,27 @@ import { setOnboarded } from "@/lib/onboarding";
 type Slide = {
   id: string;
   canAutoAdvance?: boolean;
+  autoAdvanceMs?: number;
+  timingText?: string;
 };
 
-const AUTO_ADVANCE_MS = 2200;
+const BASE_SECONDS = 2.2;
+const SECONDS_PER_CHARACTER = 0.12;
+const MIN_SECONDS = 3.5;
+const MAX_SECONDS = 9;
+
+function clamp(min: number, max: number, value: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getVisibleCharacterCount(text: string): number {
+  return text.replace(/\s+/g, "").length;
+}
+
+function getSlideDurationMs(text: string): number {
+  const seconds = BASE_SECONDS + getVisibleCharacterCount(text) * SECONDS_PER_CHARACTER;
+  return Math.round(clamp(MIN_SECONDS, MAX_SECONDS, seconds) * 1000);
+}
 
 export default function OnboardingFlow() {
   const router = useRouter();
@@ -18,12 +36,35 @@ export default function OnboardingFlow() {
 
   const slides: Slide[] = useMemo(
     () => [
-      { id: "intro", canAutoAdvance: true },
-      { id: "cycle", canAutoAdvance: true },
-      { id: "voice", canAutoAdvance: true },
-      { id: "door", canAutoAdvance: true },
+      {
+        id: "intro",
+        canAutoAdvance: true,
+        timingText: "A quiet place before the world begins.世界が始まる前の、静かな場所。",
+      },
+      {
+        id: "cycle",
+        canAutoAdvance: true,
+        timingText: "凛は、巡る。66 Morning Rituals",
+      },
+      {
+        id: "voice",
+        canAutoAdvance: true,
+        timingText:
+          "これは 朝の小さな儀式です。一日、三分。六十六日かけて 空気を整えていきます。This is a small morning ritual. 3 minutes a day. 66 days to refine your air.",
+      },
+      {
+        id: "door",
+        canAutoAdvance: true,
+        timingText: "最初の七日間は 静かな準備です。その先には もう一つの扉があります。",
+      },
       { id: "day1" },
-    ],
+    ].map((slide) => ({
+      ...slide,
+      autoAdvanceMs:
+        slide.canAutoAdvance && slide.timingText
+          ? getSlideDurationMs(slide.timingText)
+          : undefined,
+    })),
     [],
   );
 
@@ -35,7 +76,7 @@ export default function OnboardingFlow() {
     }
     const timer = window.setTimeout(() => {
       setIndex((prev) => Math.min(prev + 1, slides.length - 1));
-    }, AUTO_ADVANCE_MS);
+    }, slides[index]?.autoAdvanceMs ?? 4500);
     return () => window.clearTimeout(timer);
   }, [index, slides]);
 
@@ -70,80 +111,84 @@ export default function OnboardingFlow() {
         </header>
 
         <button
-          key={slides[index]?.id}
           type="button"
           onClick={handleNext}
-          className="rin-fade-in flex flex-1 flex-col items-center justify-center text-center"
+          className="flex flex-1 flex-col items-center justify-center text-center"
         >
-          {slides[index]?.id === "intro" ? (
-            <>
-              <p className="text-6xl font-medium tracking-[0.15em] md:text-7xl">RIN</p>
-              <p className="mt-8 text-base tracking-[0.06em] text-[var(--rin-muted)] md:text-lg">
-                A quiet place before the world begins.
-              </p>
-              <p className="mt-2 text-sm tracking-[0.08em] text-[var(--rin-muted)]">
-                「世界が始まる前の、静かな場所。」
-              </p>
-            </>
-          ) : null}
-
-          {slides[index]?.id === "cycle" ? (
-            <>
-              <p className="text-6xl font-medium tracking-[0.15em] md:text-7xl">RIN</p>
-              <p className="mt-8 text-3xl font-medium tracking-[0.08em] md:text-4xl">
-                「凛は、巡る。」
-              </p>
-              <p className="mt-4 text-xs tracking-[0.16em] text-[var(--rin-muted)] md:text-sm">
-                66 Morning Rituals
-              </p>
-            </>
-          ) : null}
-
-          {slides[index]?.id === "voice" ? (
-            <>
-              <div className="mb-8 h-24 w-24 rounded-full border border-[var(--rin-gold)]/60" />
-              <p className="whitespace-pre-line text-xl leading-relaxed tracking-[0.05em] md:text-2xl">
-                {"これは 朝の小さな儀式です。\n一日、三分。\n六十六日かけて 空気を整えていきます。"}
-              </p>
-              <p className="mt-6 max-w-lg text-xs tracking-[0.04em] text-[var(--rin-muted)] md:text-sm">
-                This is a small morning ritual. 3 minutes a day. 66 days to refine your air.
-              </p>
-            </>
-          ) : null}
-
-          {slides[index]?.id === "door" ? (
-            <p className="whitespace-pre-line text-xl leading-relaxed tracking-[0.05em] md:text-2xl">
-              {"最初の七日間は 静かな準備です。\nその先には もう一つの扉があります。"}
-            </p>
-          ) : null}
-
-          {slides[index]?.id === "day1" ? (
-            <div onClick={(event) => event.stopPropagation()} className="w-full max-w-lg">
-              <p className="text-6xl font-semibold tracking-[0.12em] md:text-7xl">Day 1</p>
-              <p className="mt-4 text-2xl tracking-[0.08em] md:text-3xl">「空気をまとう」</p>
-              <div className="mt-10 flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={completeOnboarding}
-                  className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/60 px-6 py-3 text-sm tracking-[0.1em] transition hover:bg-[var(--rin-gold-soft)]"
-                >
-                  Begin Ritual
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowMirrorNote((prev) => !prev)}
-                  className="rounded-full border border-[var(--rin-gold)] px-6 py-3 text-sm tracking-[0.1em] transition hover:bg-[var(--rin-gold-soft)]/20"
-                >
-                  Mirror Mode
-                </button>
-              </div>
-              {showMirrorNote ? (
-                <p className="mt-4 text-sm text-[var(--rin-muted)]">
-                  Mirror Mode is coming soon.
+          <div
+            key={slides[index]?.id}
+            className="rin-fade-in mx-auto flex min-h-[26rem] w-full max-w-2xl flex-col items-center justify-center"
+          >
+            {slides[index]?.id === "intro" ? (
+              <>
+                <p className="text-6xl font-medium tracking-[0.15em] md:text-7xl">RIN</p>
+                <p className="mt-8 text-base tracking-[0.06em] text-[var(--rin-muted)] md:text-lg">
+                  A quiet place before the world begins.
                 </p>
-              ) : null}
-            </div>
-          ) : null}
+                <p className="mt-2 text-sm tracking-[0.08em] text-[var(--rin-muted)]">
+                  「世界が始まる前の、静かな場所。」
+                </p>
+              </>
+            ) : null}
+
+            {slides[index]?.id === "cycle" ? (
+              <>
+                <p className="text-6xl font-medium tracking-[0.15em] md:text-7xl">RIN</p>
+                <p className="mt-8 text-3xl font-medium tracking-[0.08em] md:text-4xl">
+                  「凛は、巡る。」
+                </p>
+                <p className="mt-4 text-xs tracking-[0.16em] text-[var(--rin-muted)] md:text-sm">
+                  66 Morning Rituals
+                </p>
+              </>
+            ) : null}
+
+            {slides[index]?.id === "voice" ? (
+              <>
+                <div className="mb-8 h-24 w-24 rounded-full border border-[var(--rin-gold)]/60" />
+                <p className="whitespace-pre-line text-xl leading-relaxed tracking-[0.05em] md:text-2xl">
+                  {"これは 朝の小さな儀式です。\n一日、三分。\n六十六日かけて 空気を整えていきます。"}
+                </p>
+                <p className="mt-6 max-w-lg text-xs tracking-[0.04em] text-[var(--rin-muted)] md:text-sm">
+                  This is a small morning ritual. 3 minutes a day. 66 days to refine your air.
+                </p>
+              </>
+            ) : null}
+
+            {slides[index]?.id === "door" ? (
+              <p className="whitespace-pre-line text-xl leading-relaxed tracking-[0.05em] md:text-2xl">
+                {"最初の七日間は 静かな準備です。\nその先には もう一つの扉があります。"}
+              </p>
+            ) : null}
+
+            {slides[index]?.id === "day1" ? (
+              <div onClick={(event) => event.stopPropagation()} className="w-full max-w-lg">
+                <p className="text-6xl font-semibold tracking-[0.12em] md:text-7xl">Day 1</p>
+                <p className="mt-4 text-2xl tracking-[0.08em] md:text-3xl">「空気をまとう」</p>
+                <div className="mt-10 flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={completeOnboarding}
+                    className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/60 px-6 py-3 text-sm tracking-[0.1em] transition hover:bg-[var(--rin-gold-soft)]"
+                  >
+                    Begin Ritual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMirrorNote((prev) => !prev)}
+                    className="rounded-full border border-[var(--rin-gold)] px-6 py-3 text-sm tracking-[0.1em] transition hover:bg-[var(--rin-gold-soft)]/20"
+                  >
+                    Mirror Mode
+                  </button>
+                </div>
+                {showMirrorNote ? (
+                  <p className="mt-4 text-sm text-[var(--rin-muted)]">
+                    Mirror Mode is coming soon.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </button>
 
         <footer className="mt-8 flex items-center justify-between">
