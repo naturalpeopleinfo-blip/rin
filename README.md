@@ -5,6 +5,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 First, run the development server:
 
 ```bash
+killall node
 npm run dev
 # or
 yarn dev
@@ -13,6 +14,8 @@ pnpm dev
 # or
 bun dev
 ```
+
+If `3000` is already occupied and Next.js starts on another port, stop existing Node.js processes first (`killall node`) and then run `npm run dev` again.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 

@@ -9,6 +9,7 @@ export default function OnboardingFlow() {
   const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const begin = () => {
+    window.localStorage.setItem("rin_onboarded", "true");
     setOnboarded();
     router.replace("/ritual");
   };

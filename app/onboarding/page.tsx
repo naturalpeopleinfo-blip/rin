@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import OnboardingFlow from "@/app/components/OnboardingFlow";
-import { clearOnboarded, isOnboarded } from "@/lib/onboarding";
+import { clearOnboarded } from "@/lib/onboarding";
 
 export default function OnboardingPage() {
   return (
@@ -24,7 +24,7 @@ function OnboardingPageContent() {
       return;
     }
 
-    if (isOnboarded()) {
+    if (typeof window !== "undefined" && window.localStorage.getItem("rin_onboarded") === "true") {
       router.replace("/ritual");
     }
   }, [resetRequested, router]);

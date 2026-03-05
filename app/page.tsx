@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { loadDay } from "@/lib/day";
-import { isOnboarded } from "@/lib/onboarding";
 
 const OPENING_LINES = [
   "世界が始まる前の、静かな場所。",
@@ -40,7 +38,6 @@ function formatTokyoDate(date = new Date()): string {
 }
 
 export default function LobbyPage() {
-  const router = useRouter();
   const [ready, setReady] = useState(false);
   const [paused, setPaused] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
@@ -57,16 +54,11 @@ export default function LobbyPage() {
   const today = useMemo(() => formatTokyoDate(), []);
 
   useEffect(() => {
-    if (!isOnboarded()) {
-      router.replace("/onboarding");
-      return;
-    }
-
     const frame = window.requestAnimationFrame(() => {
       setReady(true);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);

@@ -3,9 +3,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toPng } from "html-to-image";
 import { getJstDateString, getYesterdayJstDateString } from "@/lib/date";
 import { incrementDay, loadDay } from "@/lib/day";
+import { isOnboarded } from "@/lib/onboarding";
 import { loadProgress, saveProgress, type Progress } from "@/lib/progress";
 import { useRinSfx } from "@/lib/useRinSfx";
 import { useSpotlight } from "@/lib/useSpotlight";
@@ -93,6 +95,7 @@ function formatTimer(totalSeconds: number): string {
 }
 
 export default function RitualPage() {
+  const router = useRouter();
   const [progress, setProgress] = useState<Progress>(() => loadProgress());
   const [timer, setTimer] = useState(TOTAL_SECONDS);
   const [running, setRunning] = useState(false);
@@ -159,6 +162,12 @@ export default function RitualPage() {
   const nextActionLabel = ritualProgressRatio >= 0.82 ? "Reflection" : "Quiet Writing";
 
   useSpotlight(ritualCardRef);
+
+  useEffect(() => {
+    if (!isOnboarded()) {
+      router.replace("/onboarding");
+    }
+  }, [router]);
 
   useEffect(() => {
     if (typeof navigator === "undefined") {
