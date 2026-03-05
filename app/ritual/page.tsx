@@ -87,6 +87,12 @@ export default function RitualPage() {
   const [paused, setPaused] = useState(false);
   const [showPreparation, setShowPreparation] = useState(true);
   const [countdownValue, setCountdownValue] = useState<number | null>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
   const [day, setDay] = useState(() => loadDay());
   const [todaysTheme] = useState(
     () => THEMES[Math.floor(Math.random() * THEMES.length)],
@@ -126,7 +132,7 @@ export default function RitualPage() {
   const ritualProgressRatio = Math.min(1, Math.max(0, elapsed / TOTAL_SECONDS));
   const topChamberPercent = (1 - ritualProgressRatio) * 100;
   const bottomChamberPercent = ritualProgressRatio * 100;
-  const sessionLabel = paused ? "Paused" : running ? "In session" : "Ready";
+  const sessionLabel = paused ? "Paused" : running ? "In ritual" : "Ready";
   const isDoneEnabled = timer === 0 && !doneToday;
   const currentStep = STEPS[currentStepIndex];
   const isImagineStep = currentStep.title === "IMAGINE";
@@ -175,6 +181,17 @@ export default function RitualPage() {
   }, [currentStepIndex]);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => {
+      setPrefersReducedMotion(event.matches);
+    };
+    mediaQuery.addEventListener("change", onChange);
+    return () => {
+      mediaQuery.removeEventListener("change", onChange);
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (startCueFadeTimerRef.current !== null) {
         window.clearTimeout(startCueFadeTimerRef.current);
@@ -210,6 +227,13 @@ export default function RitualPage() {
   };
 
   const startWithCountdown = () => {
+    if (prefersReducedMotion) {
+      clearCountdown();
+      setRunning(true);
+      setPaused(false);
+      triggerStartCue();
+      return;
+    }
     clearCountdown();
     setRunning(false);
     setCountdownValue(5);
@@ -234,7 +258,7 @@ export default function RitualPage() {
         }
         return prev - 1;
       });
-    }, 850);
+    }, 760);
   };
 
   const handleComplete = () => {
@@ -327,7 +351,7 @@ export default function RitualPage() {
         {showPreparation ? (
           <section className="rin-quiet-gift relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 p-8 shadow-sm md:p-10">
             <p className="text-center text-xs uppercase tracking-[0.24em] text-[var(--rin-muted)]">
-              Quiet Gift
+              QUIET GIFT
             </p>
             <p className="mt-2 text-center text-sm tracking-[0.08em] text-[var(--rin-muted)]">
               今日の静かな贈りもの
@@ -374,7 +398,7 @@ export default function RitualPage() {
                 BEGIN
               </button>
               <p className="text-sm tracking-[0.08em] text-[var(--rin-muted)]">
-                3分のセッションへ進みます
+                3分のリチュアルへ進みます
               </p>
             </div>
           </section>
