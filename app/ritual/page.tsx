@@ -9,6 +9,7 @@ import { incrementDay, loadDay } from "@/lib/day";
 import { loadProgress, saveProgress, type Progress } from "@/lib/progress";
 import { useSpotlight } from "@/lib/useSpotlight";
 import RinSealCard from "@/app/components/RinSealCard";
+import HourglassProgress from "@/app/components/HourglassProgress";
 
 const STEP_DURATIONS = [20, 30, 30, 60, 40] as const;
 const TOTAL_SECONDS = STEP_DURATIONS.reduce((sum, value) => sum + value, 0);
@@ -146,8 +147,6 @@ export default function RitualPage() {
     STEP_DURATIONS[currentStepIndex] - currentStepElapsed,
   );
   const ritualProgressRatio = Math.min(1, Math.max(0, elapsed / TOTAL_SECONDS));
-  const topChamberPercent = (1 - ritualProgressRatio) * 100;
-  const bottomChamberPercent = ritualProgressRatio * 100;
   const sessionLabel = paused ? "Paused" : running ? "In ritual" : "Ready";
   const isDoneEnabled = timer === 0 && !doneToday;
   const currentStep = STEPS[currentStepIndex];
@@ -302,7 +301,7 @@ export default function RitualPage() {
         }
         return prev - 1;
       });
-    }, 760);
+    }, 1400);
   };
 
   const handleComplete = () => {
@@ -481,9 +480,6 @@ export default function RitualPage() {
               <p className="mt-5 text-xs tracking-[0.08em] text-[var(--rin-muted)]/90 md:text-sm">
                 ココ・シャネル（ファッションデザイナー）
               </p>
-              <p className="mt-4 text-sm leading-relaxed text-[var(--rin-text)]/90">
-                この一行を胸に、リチュアルへ。
-              </p>
             </blockquote>
 
             <div className="card-page mt-6 rounded-xl border border-[var(--rin-gold)]/35 bg-white/26 px-6 py-7 md:px-8">
@@ -593,21 +589,7 @@ export default function RitualPage() {
                     {paused && !controlsLocked ? "Paused" : "今から3分。“私”に戻る。"}
                   </p>
                   <div className="mt-6 flex justify-center" data-resettable>
-                    <div className="rin-hourglass-pill">
-                      <div className="rin-hourglass-chamber rin-hourglass-top">
-                        <div
-                          className={`rin-hourglass-liquid ${running ? "rin-hourglass-flow" : ""}`}
-                          style={{ height: `${topChamberPercent}%` }}
-                        />
-                      </div>
-                      <div className="rin-hourglass-neck" />
-                      <div className="rin-hourglass-chamber rin-hourglass-bottom">
-                        <div
-                          className={`rin-hourglass-liquid ${running ? "rin-hourglass-flow" : ""}`}
-                          style={{ height: `${bottomChamberPercent}%` }}
-                        />
-                      </div>
-                    </div>
+                    <HourglassProgress progress={ritualProgressRatio} />
                   </div>
                   <div className="mt-7 flex justify-center gap-3">
                     <button
