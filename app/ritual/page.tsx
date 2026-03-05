@@ -7,12 +7,14 @@ import { toPng } from "html-to-image";
 import { getJstDateString, getYesterdayJstDateString } from "@/lib/date";
 import { incrementDay, loadDay } from "@/lib/day";
 import { loadProgress, saveProgress, type Progress } from "@/lib/progress";
+import { useRinSfx } from "@/lib/useRinSfx";
 import { useSpotlight } from "@/lib/useSpotlight";
 import RinSealCard from "@/app/components/RinSealCard";
 import HourglassProgress from "@/app/components/HourglassProgress";
 
 const STEP_DURATIONS = [20, 30, 30, 60, 40] as const;
 const TOTAL_SECONDS = STEP_DURATIONS.reduce((sum, value) => sum + value, 0);
+const TOTAL_DAYS = 66;
 const THEMES = [
   "静かな自信をまとう",
   "選ばれる所作が整う",
@@ -117,6 +119,7 @@ export default function RitualPage() {
   const [canShareSeal, setCanShareSeal] = useState(false);
   const [isSavingSeal, setIsSavingSeal] = useState(false);
   const [isSharingSeal, setIsSharingSeal] = useState(false);
+  const [journeyDay, setJourneyDay] = useState(1);
   const startCueFadeTimerRef = useRef<number | null>(null);
   const resetTimerRef = useRef<number | null>(null);
   const countdownTimerRef = useRef<number | null>(null);
@@ -125,6 +128,7 @@ export default function RitualPage() {
   const completionTriggeredRef = useRef(false);
   const sealCardRef = useRef<HTMLDivElement | null>(null);
   const ritualCardRef = useRef<HTMLElement | null>(null);
+  const { playStart, playTransition } = useRinSfx();
 
   const today = getJstDateString();
   const todayDisplay = useMemo(() => formatTokyoDate(), []);
@@ -151,6 +155,8 @@ export default function RitualPage() {
   const isDoneEnabled = timer === 0 && !doneToday;
   const currentStep = STEPS[currentStepIndex];
   const isImagineStep = currentStep.title === "IMAGINE";
+  const nextActionVisible = ritualProgressRatio >= 0.6 && !controlsLocked && timer > 0;
+  const nextActionLabel = ritualProgressRatio >= 0.82 ? "Reflection" : "Quiet Writing";
 
   useSpotlight(ritualCardRef);
 
@@ -162,6 +168,20 @@ export default function RitualPage() {
       typeof navigator.share === "function" &&
       typeof navigator.canShare === "function";
     setCanShareSeal(shareAvailable);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const storedDay = window.localStorage.getItem("rin_day");
+    const parsedDay = Number.parseInt(storedDay ?? "1", 10);
+    if (!Number.isNaN(parsedDay) && parsedDay > 0) {
+      setJourneyDay(Math.min(parsedDay, TOTAL_DAYS));
+      return;
+    }
+    window.localStorage.setItem("rin_day", "1");
+    setJourneyDay(1);
   }, []);
 
   useEffect(() => {
@@ -272,6 +292,7 @@ export default function RitualPage() {
   const startWithCountdown = () => {
     if (prefersReducedMotion) {
       clearCountdown();
+      playTransition();
       setRunning(true);
       setPaused(false);
       triggerStartCue();
@@ -287,6 +308,7 @@ export default function RitualPage() {
         }
         if (prev <= 1) {
           clearCountdown();
+          playTransition();
           setRunning(true);
           setPaused(false);
           triggerStartCue();
@@ -301,7 +323,7 @@ export default function RitualPage() {
         }
         return prev - 1;
       });
-    }, 1400);
+    }, 1800);
   };
 
   const handleComplete = () => {
@@ -312,6 +334,7 @@ export default function RitualPage() {
   };
 
   const handleBeginRitual = () => {
+    playStart();
     setShowPreparation(false);
     completionTriggeredRef.current = false;
     setShowSeal(false);
@@ -427,7 +450,13 @@ export default function RitualPage() {
           <Link href="/" className="hover:underline">
             ← Lobby
           </Link>
-          <p>継続 {progress.streak}日 / 記録 {progress.points}</p>
+          {showPreparation || showSeal ? (
+            <p>継続 {progress.streak}日 / 記録 {progress.points}</p>
+          ) : (
+            <span aria-hidden className="opacity-0">
+              継続 00日 / 記録 00
+            </span>
+          )}
         </header>
 
         <section className="text-center">
@@ -470,15 +499,15 @@ export default function RitualPage() {
             </p>
             <div className="section-divider" />
 
-            <blockquote className="card-page mt-8 rounded-xl border border-[var(--rin-gold)]/35 bg-white/34 px-6 py-7 md:px-8">
+            <blockquote className="rin-quiet-gift-paper card-page mt-8 rounded-xl px-7 py-9 md:px-10 md:py-10">
               <p className="rin-quiet-gift-quote text-lg leading-[1.95] italic md:text-xl">
                 “{INTRO_QUOTE.english}”
               </p>
               <p className="mt-5 text-sm leading-[1.9] text-[var(--rin-muted)] md:text-[15px]">
                 「{INTRO_QUOTE.japanese}」
               </p>
-              <p className="mt-5 text-xs tracking-[0.08em] text-[var(--rin-muted)]/90 md:text-sm">
-                ココ・シャネル（ファッションデザイナー）
+              <p className="mt-6 text-[11px] tracking-[0.11em] text-[var(--rin-muted)]/82 md:text-xs">
+                {INTRO_QUOTE.author}（{INTRO_QUOTE.role}）
               </p>
             </blockquote>
 
@@ -552,6 +581,9 @@ export default function RitualPage() {
                   <span className="rin-imagine-bloom-haze" />
                 </div>
               ) : null}
+              <p className="mt-4 text-[11px] uppercase tracking-[0.16em] text-[var(--rin-gold)]/65 md:text-xs">
+                Day {journeyDay} / {TOTAL_DAYS}
+              </p>
               <div className="relative mt-3 min-h-[5rem] md:min-h-[5.6rem]" data-resettable>
                 {controlsLocked ? (
                   <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
@@ -591,6 +623,13 @@ export default function RitualPage() {
                   <div className="mt-6 flex justify-center" data-resettable>
                     <HourglassProgress progress={ritualProgressRatio} />
                   </div>
+                  <p
+                    className={`rin-next-action-hint mt-3 text-center text-xs italic tracking-[0.06em] text-[var(--rin-gold)] transition-[opacity,filter] duration-[2000ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                      nextActionVisible ? "opacity-45 blur-0" : "opacity-0 blur-[1px]"
+                    }`}
+                  >
+                    Next: {nextActionLabel}
+                  </p>
                   <div className="mt-7 flex justify-center gap-3">
                     <button
                       type="button"
@@ -695,6 +734,9 @@ export default function RitualPage() {
                 Share is unavailable in this browser.
               </p>
             ) : null}
+            <p className="mt-4 text-center text-xs tracking-[0.11em] text-[var(--rin-muted)]/90">
+              継続 {progress.streak}日 / 記録 {progress.points}
+            </p>
           </div>
         </div>
       ) : null}

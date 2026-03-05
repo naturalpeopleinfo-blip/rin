@@ -13,7 +13,10 @@ export default function HourglassProgress({ progress, size = 132 }: HourglassPro
   const ratio = clamp(progress, 0, 1);
   const percent = Math.round(ratio * 100);
   const height = Math.max(96, size);
-  const width = Math.round(height * 0.36);
+  const width = Math.round(height * 0.42);
+  const topRatio = 1 - ratio;
+  const bottomRatio = ratio;
+  const streamVisible = ratio > 0.01 && ratio < 0.995;
 
   return (
     <div
@@ -30,12 +33,27 @@ export default function HourglassProgress({ progress, size = 132 }: HourglassPro
         style={{ width: `${width}px`, height: `${height}px` }}
       >
         <div className="rin-hourglass-progress-track">
-          <div className="rin-hourglass-progress-fill" style={{ height: `${ratio * 100}%` }}>
-            <span aria-hidden className="rin-hourglass-progress-noise" />
-            <span aria-hidden className="rin-hourglass-progress-shimmer" />
+          <div className="rin-hourglass-progress-top">
+            <div className="rin-hourglass-progress-fill" style={{ height: `${topRatio * 100}%` }}>
+              <span aria-hidden className="rin-hourglass-progress-noise" />
+              <span aria-hidden className="rin-hourglass-progress-shimmer" />
+            </div>
           </div>
+          <span aria-hidden className="rin-hourglass-progress-neck" />
+          <div className="rin-hourglass-progress-bottom">
+            <div className="rin-hourglass-progress-fill" style={{ height: `${bottomRatio * 100}%` }}>
+              <span aria-hidden className="rin-hourglass-progress-noise" />
+              <span aria-hidden className="rin-hourglass-progress-shimmer" />
+            </div>
+          </div>
+          <span
+            aria-hidden
+            className={`rin-hourglass-progress-stream ${streamVisible ? "is-active" : ""}`}
+          />
         </div>
         <span aria-hidden className="rin-hourglass-progress-highlight" />
+        <span aria-hidden className="rin-hourglass-progress-highlight right" />
+        <span aria-hidden className="rin-hourglass-progress-center-glow" />
       </div>
     </div>
   );
