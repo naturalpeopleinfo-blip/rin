@@ -15,3 +15,11 @@ export function setOnboarded(): void {
 
   window.localStorage.setItem(ONBOARDED_STORAGE_KEY, "true");
 }
+
+export function clearOnboarded(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(ONBOARDED_STORAGE_KEY);
+}

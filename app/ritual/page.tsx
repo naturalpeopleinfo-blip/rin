@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { getJstDateString, getYesterdayJstDateString } from "@/lib/date";
@@ -439,7 +440,7 @@ export default function RitualPage() {
 
         <section
           ref={ritualCardRef}
-          className="rin-spotlight rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 text-center shadow-sm"
+          className="rin-spotlight card-page page-transition rounded-2xl border border-[var(--rin-gold)]/60 p-8 text-center shadow-sm"
         >
           <p className="text-xs tracking-[0.14em] text-[var(--rin-muted)]">
             Today&apos;s Theme
@@ -451,32 +452,57 @@ export default function RitualPage() {
         </section>
 
         {showPreparation ? (
-          <section className="rin-quiet-gift relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 p-8 shadow-sm md:p-10">
+          <section className="rin-quiet-gift card-page page-transition relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 p-8 shadow-sm md:p-10">
+            <div className="flex justify-center">
+              <Image
+                src="/illustrations/feather.svg"
+                alt=""
+                aria-hidden
+                width={42}
+                height={42}
+                className="opacity-70"
+              />
+            </div>
             <p className="text-center text-xs uppercase tracking-[0.24em] text-[var(--rin-muted)]">
-              QUIET GIFT
+              Quiet Gift
             </p>
             <p className="mt-2 text-center text-sm tracking-[0.08em] text-[var(--rin-muted)]">
               今日の静かな贈りもの
             </p>
+            <div className="section-divider" />
 
-            <blockquote className="mt-8 rounded-xl border border-[var(--rin-gold)]/35 bg-white/34 px-6 py-7 md:px-8">
-              <p className="rin-quiet-gift-quote text-base leading-[1.95] md:text-lg">
+            <blockquote className="card-page mt-8 rounded-xl border border-[var(--rin-gold)]/35 bg-white/34 px-6 py-7 md:px-8">
+              <p className="rin-quiet-gift-quote text-lg leading-[1.95] italic md:text-xl">
                 “{INTRO_QUOTE.english}”
               </p>
               <p className="mt-5 text-sm leading-[1.9] text-[var(--rin-muted)] md:text-[15px]">
                 「{INTRO_QUOTE.japanese}」
               </p>
               <p className="mt-5 text-xs tracking-[0.08em] text-[var(--rin-muted)]/90 md:text-sm">
-                {INTRO_QUOTE.author} / {INTRO_QUOTE.role}
+                ココ・シャネル（ファッションデザイナー）
               </p>
               <p className="mt-4 text-sm leading-relaxed text-[var(--rin-text)]/90">
                 この一行を胸に、リチュアルへ。
               </p>
             </blockquote>
 
-            <div className="mt-6 rounded-xl border border-[var(--rin-gold)]/35 bg-white/26 px-6 py-7 md:px-8">
+            <div className="card-page mt-6 rounded-xl border border-[var(--rin-gold)]/35 bg-white/26 px-6 py-7 md:px-8">
+              <div className="flex items-center justify-center gap-2">
+                <Image
+                  src="/illustrations/botanical.svg"
+                  alt=""
+                  aria-hidden
+                  width={28}
+                  height={28}
+                  className="opacity-75"
+                />
+                <span className="text-[10px] tracking-[0.2em] text-[var(--rin-muted)]">✦</span>
+              </div>
               <p className="text-sm tracking-[0.14em] text-[var(--rin-muted)] md:text-base">
                 整える
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--rin-text)]">
+                好きな香りをひと吹き。今日はこの言葉を胸に置いて始めましょう。
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-relaxed text-[var(--rin-text)] md:text-base">
                 <li>・香りを1プッシュ。</li>
@@ -507,12 +533,23 @@ export default function RitualPage() {
         ) : (
           <>
             <section
-              className={`rin-ritual-card relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 text-center transition-[box-shadow,opacity,transform,filter] duration-500 ${
+              className={`rin-ritual-card card-page page-transition relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 p-8 text-center transition-[box-shadow,opacity,transform,filter] duration-500 ${
                 running && !controlsLocked
                   ? "shadow-[0_14px_30px_rgba(61,53,39,0.12)]"
                   : "shadow-sm"
               } ${resetting ? "rin-resetting" : ""}`}
             >
+              <div className="flex items-center justify-center gap-2">
+                <Image
+                  src="/illustrations/moon.svg"
+                  alt=""
+                  aria-hidden
+                  width={26}
+                  height={26}
+                  className="opacity-75"
+                />
+                <span className="text-[10px] tracking-[0.2em] text-[var(--rin-muted)]">✦</span>
+              </div>
               {isImagineStep ? (
                 <div aria-hidden className="rin-imagine-bloom">
                   <span className="rin-imagine-bloom-core" />
@@ -540,93 +577,99 @@ export default function RitualPage() {
                   </p>
                 ) : null}
               </div>
-              <p className="mt-2 text-sm tracking-[0.08em] text-[var(--rin-muted)] transition-all duration-500" data-resettable>
-                {sessionLabel} ·{" "}
-                <span className="font-medium text-[var(--rin-text)]">
-                  {formatTimer(currentStepRemaining)}
-                </span>
-              </p>
-              <p
-                className={`mt-2 min-h-[1rem] text-xs tracking-[0.08em] text-[var(--rin-muted)] transition-opacity duration-500 ${
-                  startCueVisible || (paused && !controlsLocked) ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                {paused && !controlsLocked ? "Paused" : "今から3分。“私”に戻る。"}
-              </p>
-              <div className="mt-6 flex justify-center" data-resettable>
-                <div className="rin-hourglass-pill">
-                  <div className="rin-hourglass-chamber rin-hourglass-top">
-                    <div
-                      className={`rin-hourglass-liquid ${running ? "rin-hourglass-flow" : ""}`}
-                      style={{ height: `${topChamberPercent}%` }}
-                    />
-                  </div>
-                  <div className="rin-hourglass-neck" />
-                  <div className="rin-hourglass-chamber rin-hourglass-bottom">
-                    <div
-                      className={`rin-hourglass-liquid ${running ? "rin-hourglass-flow" : ""}`}
-                      style={{ height: `${bottomChamberPercent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
               {!controlsLocked ? (
-                <div className="mt-7 flex justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={running ? handlePause : handleResume}
-                    disabled={timer === 0}
-                    className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 transition-all duration-300 disabled:cursor-not-allowed disabled:bg-[var(--rin-gold-soft)]/55 disabled:text-[var(--rin-muted)] disabled:shadow-none"
-                  >
-                    {running ? "Pause" : "Resume"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="rounded-full border border-[var(--rin-gold)] px-6 py-2 transition-colors duration-300"
-                  >
-                    Reset
-                  </button>
-                </div>
-              ) : null}
-
-              <div
-                className={`mt-7 rounded-xl border bg-[var(--rin-gold-soft)]/20 p-4 text-left transition-all duration-200 ${
-                  stepFlash
-                    ? "border-[var(--rin-gold)] shadow-sm"
-                    : "border-[var(--rin-gold)]/60"
-                }`}
-                data-resettable
-              >
-                <p className="text-xs tracking-[0.18em] text-[var(--rin-muted)]">
-                  {currentStep.title}
-                </p>
-                <p className="mt-3 whitespace-pre-line text-sm font-medium text-[var(--rin-text)] md:text-base">
-                  {currentStep.instruction}
-                </p>
-              </div>
-              <div className="mt-8 flex flex-col items-center gap-3 pb-2">
-                <p className="text-[11px] tracking-[0.14em] text-[var(--rin-muted)]/85">
-                  {currentStepIndex + 1}/{STEPS.length}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleComplete}
-                  disabled={!isDoneEnabled || controlsLocked || showSeal}
-                  className={`rounded-full border px-12 py-3 text-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    isDoneEnabled
-                      ? "border-[var(--rin-gold)] bg-[var(--rin-gold)] text-[var(--rin-text)] shadow-sm"
-                      : "border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/70"
-                  }`}
-                >
-                  DONE
-                </button>
-                {doneToday ? (
-                  <p className="text-sm text-[var(--rin-muted)]">
-                    {completionMessage}
+                <>
+                  <p className="mt-2 text-sm tracking-[0.08em] text-[var(--rin-muted)] transition-all duration-500" data-resettable>
+                    {sessionLabel} ·{" "}
+                    <span className="font-medium text-[var(--rin-text)]">
+                      {formatTimer(currentStepRemaining)}
+                    </span>
                   </p>
-                ) : null}
-              </div>
+                  <p
+                    className={`mt-2 min-h-[1rem] text-xs tracking-[0.08em] text-[var(--rin-muted)] transition-opacity duration-500 ${
+                      startCueVisible || (paused && !controlsLocked) ? "opacity-100" : "opacity-0"
+                    }`}
+                  >
+                    {paused && !controlsLocked ? "Paused" : "今から3分。“私”に戻る。"}
+                  </p>
+                  <div className="mt-6 flex justify-center" data-resettable>
+                    <div className="rin-hourglass-pill">
+                      <div className="rin-hourglass-chamber rin-hourglass-top">
+                        <div
+                          className={`rin-hourglass-liquid ${running ? "rin-hourglass-flow" : ""}`}
+                          style={{ height: `${topChamberPercent}%` }}
+                        />
+                      </div>
+                      <div className="rin-hourglass-neck" />
+                      <div className="rin-hourglass-chamber rin-hourglass-bottom">
+                        <div
+                          className={`rin-hourglass-liquid ${running ? "rin-hourglass-flow" : ""}`}
+                          style={{ height: `${bottomChamberPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-7 flex justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={running ? handlePause : handleResume}
+                      disabled={timer === 0}
+                      className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 transition-all duration-300 disabled:cursor-not-allowed disabled:bg-[var(--rin-gold-soft)]/55 disabled:text-[var(--rin-muted)] disabled:shadow-none"
+                    >
+                      {running ? "Pause" : "Resume"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="rounded-full border border-[var(--rin-gold)] px-6 py-2 transition-colors duration-300"
+                    >
+                      Reset
+                    </button>
+                  </div>
+
+                  <div
+                    className={`mt-7 rounded-xl border bg-[var(--rin-gold-soft)]/20 p-4 text-left transition-all duration-200 ${
+                      stepFlash
+                        ? "border-[var(--rin-gold)] shadow-sm"
+                        : "border-[var(--rin-gold)]/60"
+                    }`}
+                    data-resettable
+                  >
+                    <p className="text-xs tracking-[0.18em] text-[var(--rin-muted)]">
+                      {currentStep.title}
+                    </p>
+                    <p className="mt-3 whitespace-pre-line text-sm font-medium text-[var(--rin-text)] md:text-base">
+                      {currentStep.instruction}
+                    </p>
+                  </div>
+                  <div className="mt-8 flex flex-col items-center gap-3 pb-2">
+                    <p className="text-[11px] tracking-[0.14em] text-[var(--rin-muted)]/85">
+                      {currentStepIndex + 1}/{STEPS.length}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleComplete}
+                      disabled={!isDoneEnabled || controlsLocked || showSeal}
+                      className={`rounded-full border px-12 py-3 text-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isDoneEnabled
+                          ? "border-[var(--rin-gold)] bg-[var(--rin-gold)] text-[var(--rin-text)] shadow-sm"
+                          : "border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/70"
+                      }`}
+                    >
+                      DONE
+                    </button>
+                    {doneToday ? (
+                      <p className="text-sm text-[var(--rin-muted)]">
+                        {completionMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <p className="mt-6 text-xs tracking-[0.12em] text-[var(--rin-muted)]/80">
+                  Ritual starts in...
+                </p>
+              )}
             </section>
           </>
         )}

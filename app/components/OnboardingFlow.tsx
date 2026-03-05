@@ -16,7 +16,7 @@ export default function OnboardingFlow() {
   return (
     <main className="rin-onboarding-shell min-h-screen px-6 py-10 text-[var(--rin-text)]">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-3xl items-center justify-center">
-        <section className="rin-hero-card rin-fade-in w-full max-w-xl rounded-2xl border border-[var(--rin-gold)]/55 px-8 py-12 text-center md:px-10 md:py-14">
+        <section className="rin-hero-card page-transition rin-fade-in w-full max-w-xl rounded-2xl border border-[var(--rin-gold)]/55 px-8 py-12 text-center md:px-10 md:py-14">
           <div className="rin-hero-monogram mx-auto mb-8 h-24 w-24" aria-hidden />
           <h1 className="rin-hero-rise text-6xl font-medium tracking-[0.15em] md:text-7xl">
             RIN
