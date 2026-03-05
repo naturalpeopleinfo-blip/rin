@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toPng } from "html-to-image";
 import { getJstDateString, getYesterdayJstDateString } from "@/lib/date";
 import { incrementDay, loadDay } from "@/lib/day";
 import { loadProgress, saveProgress, type Progress } from "@/lib/progress";
 import { useSpotlight } from "@/lib/useSpotlight";
+import RinSealCard from "@/app/components/RinSealCard";
 
 const STEP_DURATIONS = [20, 30, 30, 60, 40] as const;
 const TOTAL_SECONDS = STEP_DURATIONS.reduce((sum, value) => sum + value, 0);
@@ -57,6 +59,12 @@ const INTRO_QUOTE = {
   author: "ココ・シャネル",
   role: "ファッションデザイナー",
 } as const;
+const SEAL_QUOTE = {
+  author_en: "Coco Chanel",
+  author_jp: "ココ・シャネル（デザイナー）",
+  quote_en: INTRO_QUOTE.english,
+  quote_jp: INTRO_QUOTE.japanese,
+} as const;
 
 function pickRandomMessage(): string {
   return COMPLETION_MESSAGES[
@@ -102,11 +110,18 @@ export default function RitualPage() {
   const [stepFlash, setStepFlash] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [timerSettling, setTimerSettling] = useState(false);
+  const [showSeal, setShowSeal] = useState(false);
+  const [sealDay, setSealDay] = useState<number | null>(null);
+  const [canShareSeal, setCanShareSeal] = useState(false);
+  const [isSavingSeal, setIsSavingSeal] = useState(false);
+  const [isSharingSeal, setIsSharingSeal] = useState(false);
   const startCueFadeTimerRef = useRef<number | null>(null);
   const resetTimerRef = useRef<number | null>(null);
   const countdownTimerRef = useRef<number | null>(null);
   const timerSettleRef = useRef<number | null>(null);
   const previousStepIndexRef = useRef<number | null>(null);
+  const completionTriggeredRef = useRef(false);
+  const sealCardRef = useRef<HTMLDivElement | null>(null);
   const ritualCardRef = useRef<HTMLElement | null>(null);
 
   const today = getJstDateString();
@@ -138,6 +153,16 @@ export default function RitualPage() {
   const isImagineStep = currentStep.title === "IMAGINE";
 
   useSpotlight(ritualCardRef);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") {
+      return;
+    }
+    const shareAvailable =
+      typeof navigator.share === "function" &&
+      typeof navigator.canShare === "function";
+    setCanShareSeal(shareAvailable);
+  }, []);
 
   useEffect(() => {
     if (!running) {
@@ -218,6 +243,24 @@ export default function RitualPage() {
     }, 6000);
   };
 
+  const applyCompletionProgress = useCallback(() => {
+    if (doneToday) {
+      return;
+    }
+    const nextStreak =
+      progress.lastCompletedDate === yesterday ? progress.streak + 1 : 1;
+    const nextProgress: Progress = {
+      streak: nextStreak,
+      points: progress.points + 2,
+      lastCompletedDate: today,
+    };
+    const nextDay = incrementDay();
+    saveProgress(nextProgress);
+    setProgress(nextProgress);
+    setDay(nextDay);
+    setCompletionMessage(pickRandomMessage());
+  }, [doneToday, progress.lastCompletedDate, progress.points, progress.streak, today, yesterday]);
+
   const clearCountdown = () => {
     if (countdownTimerRef.current !== null) {
       window.clearInterval(countdownTimerRef.current);
@@ -265,25 +308,13 @@ export default function RitualPage() {
     if (!isDoneEnabled) {
       return;
     }
-
-    const nextStreak =
-      progress.lastCompletedDate === yesterday ? progress.streak + 1 : 1;
-
-    const nextProgress: Progress = {
-      streak: nextStreak,
-      points: progress.points + 2,
-      lastCompletedDate: today,
-    };
-    const nextDay = incrementDay();
-
-    saveProgress(nextProgress);
-    setProgress(nextProgress);
-    setDay(nextDay);
-    setCompletionMessage(pickRandomMessage());
+    applyCompletionProgress();
   };
 
   const handleBeginRitual = () => {
     setShowPreparation(false);
+    completionTriggeredRef.current = false;
+    setShowSeal(false);
     startWithCountdown();
   };
 
@@ -308,6 +339,8 @@ export default function RitualPage() {
     setRunning(false);
     setPaused(false);
     setTimerSettling(false);
+    setShowSeal(false);
+    completionTriggeredRef.current = false;
     setTimer(TOTAL_SECONDS);
     setResetting(true);
     if (resetTimerRef.current !== null) {
@@ -317,6 +350,75 @@ export default function RitualPage() {
       setResetting(false);
     }, 360);
   };
+
+  const getSealPng = async (): Promise<string> => {
+    if (!sealCardRef.current) {
+      throw new Error("seal card not ready");
+    }
+    return toPng(sealCardRef.current, {
+      pixelRatio: 2,
+      backgroundColor: "#f4efe3",
+      cacheBust: true,
+    });
+  };
+
+  const sealFilename = `RIN-Day-${String(sealDay ?? day).padStart(2, "0")}.png`;
+
+  const handleSaveSeal = async () => {
+    if (isSavingSeal) {
+      return;
+    }
+    setIsSavingSeal(true);
+    try {
+      const dataUrl = await getSealPng();
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = sealFilename;
+      link.click();
+    } finally {
+      setIsSavingSeal(false);
+    }
+  };
+
+  const handleShareSeal = async () => {
+    if (!canShareSeal || isSharingSeal) {
+      return;
+    }
+    setIsSharingSeal(true);
+    try {
+      const dataUrl = await getSealPng();
+      const blob = await fetch(dataUrl).then((response) => response.blob());
+      const file = new File([blob], sealFilename, { type: "image/png" });
+      if (!navigator.canShare({ files: [file] })) {
+        setCanShareSeal(false);
+        return;
+      }
+      await navigator.share({
+        title: "RIN",
+        text: "",
+        files: [file],
+      });
+    } finally {
+      setIsSharingSeal(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      showPreparation ||
+      controlsLocked ||
+      timer !== 0 ||
+      completionTriggeredRef.current
+    ) {
+      return;
+    }
+    completionTriggeredRef.current = true;
+    setRunning(false);
+    setPaused(false);
+    setSealDay(day);
+    applyCompletionProgress();
+    setShowSeal(true);
+  }, [applyCompletionProgress, controlsLocked, day, showPreparation, timer]);
 
   return (
     <main className="min-h-screen bg-[var(--rin-bg)] px-6 py-10 text-[var(--rin-text)]">
@@ -510,7 +612,7 @@ export default function RitualPage() {
                 <button
                   type="button"
                   onClick={handleComplete}
-                  disabled={!isDoneEnabled || controlsLocked}
+                  disabled={!isDoneEnabled || controlsLocked || showSeal}
                   className={`rounded-full border px-12 py-3 text-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     isDoneEnabled
                       ? "border-[var(--rin-gold)] bg-[var(--rin-gold)] text-[var(--rin-text)] shadow-sm"
@@ -529,6 +631,48 @@ export default function RitualPage() {
           </>
         )}
       </div>
+      {showSeal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgba(34,29,21,0.36)] p-6 backdrop-blur-[4px]">
+          <div className="w-full max-w-lg">
+            <RinSealCard
+              ref={sealCardRef}
+              theme={todaysTheme}
+              day={sealDay ?? day}
+              quote={SEAL_QUOTE}
+            />
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveSeal}
+                disabled={isSavingSeal}
+                className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-6 py-2 text-sm tracking-[0.08em] transition hover:bg-[var(--rin-gold-soft)]/80 disabled:opacity-60"
+              >
+                {isSavingSeal ? "Saving..." : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={handleShareSeal}
+                disabled={!canShareSeal || isSharingSeal}
+                className="rounded-full border border-[var(--rin-gold)] px-6 py-2 text-sm tracking-[0.08em] transition hover:bg-[var(--rin-gold-soft)]/18 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {isSharingSeal ? "Sharing..." : "Share"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSeal(false)}
+                className="rounded-full border border-[var(--rin-gold)]/65 px-6 py-2 text-sm tracking-[0.08em] text-[var(--rin-muted)] transition hover:bg-[var(--rin-gold-soft)]/16"
+              >
+                Close
+              </button>
+            </div>
+            {!canShareSeal ? (
+              <p className="mt-2 text-center text-xs text-[var(--rin-muted)]">
+                Share is unavailable in this browser.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -39,6 +39,102 @@ body {
   will-change: opacity, transform;
 }
 
+@keyframes rin-hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rin-onboarding-shell {
+  position: relative;
+  background:
+    radial-gradient(circle at 24% 20%, rgba(255, 249, 230, 0.58) 0%, rgba(255, 249, 230, 0) 52%),
+    radial-gradient(circle at 78% 84%, rgba(244, 227, 176, 0.2) 0%, rgba(244, 227, 176, 0) 56%),
+    var(--rin-bg);
+}
+
+.rin-onboarding-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(212, 190, 125, 0.22) 0.8px, transparent 0.9px);
+  background-size: 11px 11px;
+  opacity: 0.08;
+}
+
+.rin-hero-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(252, 248, 236, 0.94) 0%, rgba(248, 241, 220, 0.9) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 251, 240, 0.52),
+    0 18px 38px rgba(61, 53, 39, 0.11);
+}
+
+.rin-hero-card::before {
+  content: "";
+  position: absolute;
+  inset: -22%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    circle at 50% 26%,
+    rgba(255, 248, 223, 0.54) 0%,
+    rgba(255, 248, 223, 0.16) 35%,
+    rgba(255, 248, 223, 0) 70%
+  );
+  filter: blur(8px);
+}
+
+.rin-hero-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.rin-hero-monogram {
+  position: relative;
+  opacity: 0.45;
+}
+
+.rin-hero-monogram::before,
+.rin-hero-monogram::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.rin-hero-monogram::before {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 190, 125, 0.48);
+}
+
+.rin-hero-monogram::after {
+  width: 1px;
+  height: 64px;
+  background: linear-gradient(
+    180deg,
+    rgba(212, 190, 125, 0) 0%,
+    rgba(212, 190, 125, 0.56) 48%,
+    rgba(212, 190, 125, 0) 100%
+  );
+}
+
+.rin-hero-rise {
+  animation: rin-hero-rise 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes rin-progress-glow {
   0% {
     transform: translateX(-160%);
@@ -244,6 +340,30 @@ body {
     "Times New Roman",
     ui-serif,
     serif;
+  letter-spacing: 0.01em;
+}
+
+.rin-seal-card {
+  background:
+    linear-gradient(180deg, rgba(252, 247, 234, 0.98) 0%, rgba(246, 239, 218, 0.97) 100%);
+}
+
+.rin-seal-glow {
+  position: absolute;
+  inset: -30% -20% auto -20%;
+  height: 56%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 246, 219, 0.45) 0%,
+    rgba(255, 246, 219, 0.14) 40%,
+    rgba(255, 246, 219, 0) 70%
+  );
+  filter: blur(10px);
+}
+
+.rin-seal-quote {
+  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
   letter-spacing: 0.01em;
 }
 
@@ -461,6 +581,10 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .rin-progress-glow {
+    animation: none;
+  }
+
+  .rin-hero-rise {
     animation: none;
   }
 
