@@ -247,37 +247,40 @@ export default function RitualPage() {
         </section>
 
         {showPreparation ? (
-          <section className="rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 shadow-sm md:p-10">
+          <section className="rin-prep-bloom relative overflow-hidden rounded-2xl border border-[var(--rin-gold)]/60 bg-white/60 p-8 shadow-sm md:p-10">
             <p className="text-center text-xs uppercase tracking-[0.24em] text-[var(--rin-muted)]">
               Preparation
             </p>
 
             <div className="mt-8 rounded-xl border border-[var(--rin-gold)]/45 bg-[var(--rin-gold-soft)]/10 px-6 py-7 md:px-8">
               <p className="text-xs uppercase tracking-[0.2em] text-[var(--rin-muted)]">
-                Quote
+                QUOTE
               </p>
-              <blockquote className="mt-4">
-                <p className="text-lg leading-[1.85] md:text-xl">
+              <blockquote className="mt-4 border-y border-[var(--rin-gold)]/30 py-5">
+                <p className="text-base leading-[1.9] md:text-lg">
                   “{INTRO_QUOTE.english}”
                 </p>
-                <p className="mt-5 text-sm leading-[1.9] text-[var(--rin-muted)] md:text-base">
+                <p className="mt-5 text-sm leading-[1.9] text-[var(--rin-muted)] md:text-[15px]">
                   「{INTRO_QUOTE.japanese}」
                 </p>
-                <p className="mt-5 text-sm tracking-[0.08em] text-[var(--rin-muted)] md:text-base">
+                <p className="mt-5 text-xs tracking-[0.08em] text-[var(--rin-muted)] md:text-sm">
                   {INTRO_QUOTE.author} / {INTRO_QUOTE.role}
                 </p>
               </blockquote>
             </div>
 
             <div className="mt-6 rounded-xl border border-[var(--rin-gold)]/45 bg-[var(--rin-gold-soft)]/10 px-6 py-7 md:px-8">
-              <p className="text-sm tracking-[0.14em] text-[var(--rin-muted)] md:text-base">
-                空気を整える
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--rin-muted)]">
+                PREP
               </p>
-              <p className="mt-4 text-sm leading-[1.95] text-[var(--rin-text)] md:text-base">
-                香水なら1プッシュ。キャンドルなら火を灯す。お茶でもいい。好きな香りを、ひとつ近くに置く。
+              <p className="mt-4 text-base leading-[1.8] text-[var(--rin-text)]">
+                整える
               </p>
-              <p className="mt-4 text-sm leading-relaxed text-[var(--rin-muted)] md:text-base">
-                準備が整ったら、BEGIN。
+              <p className="mt-3 text-sm leading-[1.95] text-[var(--rin-text)] md:text-base">
+                香りをひと吹き。手元に置いて、深呼吸をひとつ。
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--rin-muted)] md:text-base">
+                香水でも、お茶でも、あなたの落ち着くものを。
               </p>
             </div>
 
@@ -285,12 +288,12 @@ export default function RitualPage() {
               <button
                 type="button"
                 onClick={handleBeginRitual}
-                className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)] px-12 py-3 text-sm tracking-[0.2em] transition hover:bg-[var(--rin-gold-soft)]/80"
+                className="rin-begin-button rounded-full border border-[var(--rin-gold)] px-12 py-3 text-sm tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rin-gold)]/65 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--rin-bg)]"
               >
                 BEGIN
               </button>
               <p className="text-sm tracking-[0.08em] text-[var(--rin-muted)]">
-                3分のリチュアルを始めます
+                3分のRitualへ進みます
               </p>
             </div>
           </section>
