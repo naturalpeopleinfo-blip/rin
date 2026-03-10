@@ -7,7 +7,7 @@ import { incrementDay, loadDay } from "@/lib/day";
 import { isOnboarded } from "@/lib/onboarding";
 import { loadProgress, saveProgress, type Progress } from "@/lib/progress";
 import { useRinSfx } from "@/lib/useRinSfx";
-import BreathRing from "@/app/components/BreathRing";
+import BreathRing, { type BreathRingStepTone } from "@/app/components/BreathRing";
 
 const STEP_DURATIONS = [20, 30, 30, 25, 25, 25, 25] as const;
 const TOTAL_SECONDS = STEP_DURATIONS.reduce((sum, value) => sum + value, 0);
@@ -109,6 +109,11 @@ const BEGIN_ENTRANCE_TIMINGS_MS = {
   ringInhaleDelay: 140,
   startCountdown: 860,
 } as const;
+const COMPLETION_TIMINGS_MS = {
+  messageReveal: 920,
+  fadeOut: 2260,
+  routePush: 2980,
+} as const;
 
 type PreparationRevealState = {
   theme: boolean;
@@ -117,6 +122,8 @@ type PreparationRevealState = {
   ring: boolean;
   begin: boolean;
 };
+
+type CompletionPhase = "idle" | "settling" | "message" | "fading";
 
 const PREPARATION_REVEAL_BASE: PreparationRevealState = {
   theme: true,
@@ -154,6 +161,7 @@ export default function RitualPage() {
   const [preparationReveal, setPreparationReveal] = useState<PreparationRevealState>(
     PREPARATION_REVEAL_BASE,
   );
+  const [completionPhase, setCompletionPhase] = useState<CompletionPhase>("idle");
   const [journeyDay] = useState(() => {
     if (typeof window === "undefined") {
       return 1;
@@ -175,6 +183,8 @@ export default function RitualPage() {
   const beginPressRef = useRef<number | null>(null);
   const beginRingRef = useRef<number | null>(null);
   const beginStartRef = useRef<number | null>(null);
+  const completionMessageRef = useRef<number | null>(null);
+  const completionFadeRef = useRef<number | null>(null);
   const completionTriggeredRef = useRef(false);
   const { playStart, playTransition } = useRinSfx();
 
@@ -182,7 +192,7 @@ export default function RitualPage() {
   const todayDisplay = useMemo(() => formatTokyoDate(), []);
   const yesterday = getYesterdayJstDateString();
   const elapsed = TOTAL_SECONDS - timer;
-  const controlsLocked = countdownValue !== null;
+  const controlsLocked = countdownValue !== null || completionPhase !== "idle";
   const cumulativeDurations = STEP_DURATIONS.reduce<number[]>((acc, duration) => {
     const previous = acc[acc.length - 1] ?? 0;
     acc.push(previous + duration);
@@ -213,6 +223,9 @@ export default function RitualPage() {
   const ringTimeLabel = showPreparation ? formatTimer(TOTAL_SECONDS) : formatTimer(timer);
   const ringProgress = showPreparation ? 0.06 : ritualProgressRatio;
   const ringMode = !showPreparation && isBreatheStep ? "breathe" : "ambient";
+  const ringStepTone: BreathRingStepTone = showPreparation
+    ? "preparation"
+    : (currentStep.title.toLowerCase() as BreathRingStepTone);
   const ringActive = !showPreparation && running && !paused && timer > 0 && !controlsLocked;
   const ringPaused = !showPreparation && (paused || controlsLocked);
 
@@ -311,6 +324,12 @@ export default function RitualPage() {
       if (beginStartRef.current !== null) {
         window.clearTimeout(beginStartRef.current);
       }
+      if (completionMessageRef.current !== null) {
+        window.clearTimeout(completionMessageRef.current);
+      }
+      if (completionFadeRef.current !== null) {
+        window.clearTimeout(completionFadeRef.current);
+      }
     };
   }, []);
 
@@ -351,6 +370,8 @@ export default function RitualPage() {
 
   const startWithCountdown = () => {
     clearCountdown();
+    setCompletionPhase("idle");
+    setIsCompleting(false);
     setTimer(TOTAL_SECONDS);
     setRunning(false);
     setPaused(false);
@@ -454,6 +475,8 @@ export default function RitualPage() {
     setRunning(false);
     setPaused(false);
     completionTriggeredRef.current = false;
+    setCompletionPhase("idle");
+    setIsCompleting(false);
     setTimer(TOTAL_SECONDS);
     setResetting(true);
     if (resetTimerRef.current !== null) {
@@ -502,13 +525,35 @@ export default function RitualPage() {
         );
       }
 
-      setIsCompleting(true);
+      if (prefersReducedMotion) {
+        setCompletionPhase("fading");
+        setIsCompleting(true);
+        completeTransitionRef.current = window.setTimeout(() => router.push("/share"), 0);
+        return;
+      }
+
+      setCompletionPhase("settling");
+      completionMessageRef.current = window.setTimeout(() => {
+        setCompletionPhase("message");
+      }, COMPLETION_TIMINGS_MS.messageReveal);
+      completionFadeRef.current = window.setTimeout(() => {
+        setCompletionPhase("fading");
+        setIsCompleting(true);
+      }, COMPLETION_TIMINGS_MS.fadeOut);
       completeTransitionRef.current = window.setTimeout(
         () => router.push("/share"),
-        prefersReducedMotion ? 0 : 760,
+        COMPLETION_TIMINGS_MS.routePush,
       );
     }, 0);
-    return () => window.clearTimeout(completeNow);
+    return () => {
+      window.clearTimeout(completeNow);
+      if (completionMessageRef.current !== null) {
+        window.clearTimeout(completionMessageRef.current);
+      }
+      if (completionFadeRef.current !== null) {
+        window.clearTimeout(completionFadeRef.current);
+      }
+    };
   }, [
     controlsLocked,
     day,
@@ -526,13 +571,14 @@ export default function RitualPage() {
 
   return (
     <main
+      data-completion={completionPhase}
       className={`h-[100svh] min-h-[100svh] overflow-hidden overscroll-none bg-[var(--rin-bg)] text-[var(--rin-text)] transition-opacity duration-[800ms] ease-in-out ${
         isCompleting ? "opacity-0" : "opacity-100"
       }`}
     >
       <div
         className={`mx-auto flex h-full w-full max-w-md flex-col px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] ${
-          isActivePhase ? "pt-2.5" : "pt-3.5"
+          isActivePhase ? "pt-3" : "pt-3.5"
         }`}
       >
         <header
@@ -563,8 +609,22 @@ export default function RitualPage() {
           )}
         </header>
 
-        <section className="flex flex-1 min-h-0 flex-col items-center justify-center px-1.5 py-1.5">
-          <div className="flex w-full flex-1 min-h-0 flex-col items-center justify-center text-center">
+        <section
+          className={`flex flex-1 min-h-0 flex-col items-center justify-center px-1.5 ${
+            isActivePhase ? "pt-2 pb-1.5" : "py-1.5"
+          }`}
+        >
+          <div
+            className={`rin-ritual-core-flow flex w-full flex-1 min-h-0 flex-col items-center justify-center text-center ${
+              !showPreparation && completionPhase !== "idle"
+                ? completionPhase === "message"
+                  ? "is-message"
+                  : completionPhase === "fading"
+                    ? "is-fading"
+                    : "is-settling"
+                : ""
+            }`}
+          >
             {showPreparation ? (
               <div className="w-full text-center">
                 <div className={`rin-prep-reveal ${preparationReveal.card ? "is-visible" : ""}`}>
@@ -603,10 +663,10 @@ export default function RitualPage() {
                 <p className="rin-step-meta text-[11px] tracking-[0.1em] text-[var(--rin-muted)]/88">
                   Step {displayedStepIndex + 1}/{STEPS.length}
                 </p>
-                <p className="rin-step-label mt-1 text-[10px] tracking-[0.2em] text-[var(--rin-muted)]">
+                <p className="rin-step-label mt-1.5 text-[10px] tracking-[0.2em] text-[var(--rin-muted)]">
                   {displayedStep.title}
                 </p>
-                <div className="rin-ritual-copy-stack mx-auto mt-2.5">
+                <div className="rin-ritual-copy-stack mx-auto mt-3">
                   {displayedInstructionParagraphs.map((paragraph, index) => (
                     <p key={`${displayedStep.title}-${index}`} className="rin-ritual-copy text-[var(--rin-text)]">
                       {paragraph}
@@ -621,7 +681,7 @@ export default function RitualPage() {
                   ? `is-preparation rin-prep-reveal mt-2.5 ${
                       preparationReveal.ring ? "is-visible" : ""
                     } ${ringEntranceActive ? "is-entrance" : ""}`
-                  : "mt-3"
+                  : "mt-3.5"
               }`}
             >
               <BreathRing
@@ -629,6 +689,7 @@ export default function RitualPage() {
                 countdownValue={showPreparation ? null : countdownValue}
                 progress={ringProgress}
                 mode={ringMode}
+                stepTone={ringStepTone}
                 active={ringActive}
                 paused={ringPaused}
               />
@@ -638,77 +699,104 @@ export default function RitualPage() {
 
         <footer className={`shrink-0 ${isActivePhase ? "pt-0.5" : "pt-1"}`}>
           <section
-            className={`mx-auto w-full max-w-[22.5rem] border border-[var(--rin-gold)]/60 bg-[color:rgba(251,247,236,0.86)] shadow-sm transition-[opacity,transform,filter,padding,border-radius] duration-[1200ms] ease-out ${
-              isActivePhase ? "rounded-xl p-2.5" : "rounded-2xl p-3"
-            } ${
+            className={`mx-auto w-full max-w-[22.5rem] border border-[var(--rin-gold)]/52 bg-[color:rgba(251,247,236,0.82)] shadow-[0_1px_4px_rgba(61,53,39,0.06)] transition-[opacity,transform,filter,padding,border-radius] duration-[1200ms] ease-out ${
+              isActivePhase ? "rounded-xl px-2.5 py-2" : "rounded-2xl p-3"
+            } ${completionPhase !== "idle" && !showPreparation ? "rin-ritual-complete-panel" : ""} ${
               resetting ? "rin-resetting" : ""
             }`}
           >
             <div
-              className={`transition-[opacity,transform] ease-in-out ${
-                controlsLocked
-                  ? "pointer-events-none translate-y-2 opacity-0"
-                  : "translate-y-0 opacity-100"
-              } ${prefersReducedMotion ? "duration-0" : "duration-[600ms]"}`}
+              className={`transition-[opacity,transform,filter] ease-in-out ${
+                prefersReducedMotion ? "duration-0" : "duration-[600ms]"
+              }`}
             >
               <p
                 className={`text-center tracking-[0.04em] text-[var(--rin-muted)]/90 transition-opacity duration-[1200ms] ${
-                  isActivePhase ? "text-[10px]" : "text-[11px]"
+                  isActivePhase ? "text-[9.5px]" : "text-[11px]"
                 } ${
-                  nextActionLabel && !showPreparation ? "opacity-100" : "opacity-0"
+                  nextActionLabel && !showPreparation && completionPhase === "idle"
+                    ? "opacity-100"
+                    : "opacity-0"
                 }`}
               >
                 {nextActionLabel ? `NEXT: ${nextActionLabel}` : ""}
               </p>
 
               <div
-                className={`flex w-full min-h-[2.1rem] items-center justify-center ${
-                  isActivePhase ? "mt-1.5" : "mt-2.5"
+                className={`relative flex w-full min-h-[2.2rem] items-center justify-center ${
+                  isActivePhase ? "mt-1" : "mt-2.5"
                 }`}
               >
-                {showPreparation ? (
-                  <div className={`rin-prep-reveal ${preparationReveal.begin ? "is-visible" : ""}`}>
-                    <button
-                      type="button"
-                      onClick={handleBeginRitual}
-                      disabled={
-                        controlsLocked ||
-                        beginEntranceActive ||
-                        (!prefersReducedMotion && !preparationReveal.begin)
-                      }
-                      className={`rin-begin-button rounded-full border border-[var(--rin-gold)] px-7 py-2.5 text-xs tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rin-gold)]/65 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--rin-bg)] ${
-                        beginPressing ? "is-pressing" : ""
-                      }`}
-                    >
-                      BEGIN
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex w-full justify-center">
-                    <div className="inline-flex items-center justify-center gap-3">
+                <div
+                  className={`transition-[opacity,transform,filter] ease-in-out ${
+                    controlsLocked
+                      ? "pointer-events-none translate-y-2 opacity-0 blur-[1px]"
+                      : "translate-y-0 opacity-100 blur-0"
+                  } ${prefersReducedMotion ? "duration-0" : "duration-[560ms]"}`}
+                >
+                  {showPreparation ? (
+                    <div className={`rin-prep-reveal ${preparationReveal.begin ? "is-visible" : ""}`}>
                       <button
                         type="button"
-                        onClick={running ? handlePause : handleResume}
-                        disabled={timer === 0 || controlsLocked}
-                        className={`rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/45 tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45 ${
-                          isActivePhase ? "px-4 py-1 text-[10px]" : "px-5 py-1.5 text-[11px]"
+                        onClick={handleBeginRitual}
+                        disabled={
+                          controlsLocked ||
+                          beginEntranceActive ||
+                          (!prefersReducedMotion && !preparationReveal.begin)
+                        }
+                        className={`rin-begin-button rounded-full border border-[var(--rin-gold)] px-7 py-2.5 text-xs tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rin-gold)]/65 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--rin-bg)] ${
+                          beginPressing ? "is-pressing" : ""
                         }`}
                       >
-                        {running ? "Pause" : "Resume"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleReset}
-                        disabled={controlsLocked}
-                        className={`rounded-full border border-[var(--rin-gold)] tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45 ${
-                          isActivePhase ? "px-4 py-1 text-[10px]" : "px-5 py-1.5 text-[11px]"
-                        }`}
-                      >
-                        Reset
+                        BEGIN
                       </button>
                     </div>
+                  ) : (
+                    <div className="flex w-full justify-center">
+                      <div className="inline-flex items-center justify-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={running ? handlePause : handleResume}
+                          disabled={timer === 0 || controlsLocked}
+                          className={`rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/45 tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                            isActivePhase ? "px-4 py-1 text-[10px]" : "px-5 py-1.5 text-[11px]"
+                          }`}
+                        >
+                          {running ? "Pause" : "Resume"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleReset}
+                          disabled={controlsLocked}
+                          className={`rounded-full border border-[var(--rin-gold)] tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                            isActivePhase ? "px-4 py-1 text-[10px]" : "px-5 py-1.5 text-[11px]"
+                          }`}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {!showPreparation ? (
+                  <div
+                    className={`rin-ritual-completion-note pointer-events-none absolute inset-0 flex flex-col items-center justify-center ${
+                      completionPhase === "message"
+                        ? "is-visible"
+                        : completionPhase === "fading"
+                          ? "is-fading"
+                          : completionPhase === "settling"
+                            ? "is-settling"
+                            : ""
+                    }`}
+                    aria-live="polite"
+                  >
+                    <p className="text-[11px] tracking-[0.08em] text-[var(--rin-text)]/90">整いました。</p>
+                    <p className="mt-1 text-[10px] tracking-[0.045em] text-[var(--rin-muted)]/88">
+                      この静けさのまま、次へ。
+                    </p>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </section>

@@ -2,11 +2,22 @@
 
 import type { CSSProperties } from "react";
 
+export type BreathRingStepTone =
+  | "preparation"
+  | "reset"
+  | "breathe"
+  | "imagine"
+  | "become"
+  | "declare"
+  | "move"
+  | "switch";
+
 type BreathRingProps = {
   timeLabel: string;
   countdownValue?: number | null;
   progress: number;
   mode?: "ambient" | "breathe";
+  stepTone?: BreathRingStepTone;
   active: boolean;
   paused: boolean;
 };
@@ -16,6 +27,7 @@ export default function BreathRing({
   countdownValue = null,
   progress,
   mode = "ambient",
+  stepTone = "preparation",
   active,
   paused,
 }: BreathRingProps) {
@@ -28,6 +40,7 @@ export default function BreathRing({
     <div
       className={`rin-breath-ring-ui rin-ring ${active ? "is-active" : ""} ${paused ? "is-paused" : ""}`}
       data-mode={mode}
+      data-step={stepTone}
       style={ringStyle}
       aria-live="polite"
       aria-label={`Ritual timer ${timeLabel}`}

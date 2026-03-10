@@ -63,7 +63,7 @@ export default function SharePage() {
     });
   };
 
-  const sealFilename = `RIN-Day-${String(payload?.day ?? 1).padStart(2, "0")}.png`;
+  const sealFilename = `Ritual-Day-${String(payload?.day ?? 1).padStart(2, "0")}.png`;
 
   const handleSaveSeal = async () => {
     if (isSavingSeal || !payload) {
@@ -95,7 +95,7 @@ export default function SharePage() {
         return;
       }
       await navigator.share({
-        title: "RIN",
+        title: "Today, in tune.",
         text: "",
         files: [file],
       });
