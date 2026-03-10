@@ -98,6 +98,33 @@ function formatTimer(totalSeconds: number): string {
 }
 
 const COUNTDOWN_TICK_MS = 1300;
+const PREPARATION_REVEAL_TIMINGS_MS = {
+  card: 250,
+  description: 700,
+  ring: 1200,
+  begin: 1700,
+} as const;
+const BEGIN_ENTRANCE_TIMINGS_MS = {
+  buttonPress: 180,
+  ringInhaleDelay: 140,
+  startCountdown: 860,
+} as const;
+
+type PreparationRevealState = {
+  theme: boolean;
+  card: boolean;
+  description: boolean;
+  ring: boolean;
+  begin: boolean;
+};
+
+const PREPARATION_REVEAL_BASE: PreparationRevealState = {
+  theme: true,
+  card: false,
+  description: false,
+  ring: false,
+  begin: false,
+};
 
 export default function RitualPage() {
   const router = useRouter();
@@ -121,6 +148,12 @@ export default function RitualPage() {
   const [isCompleting, setIsCompleting] = useState(false);
   const [displayedStepIndex, setDisplayedStepIndex] = useState(0);
   const [stepTransitionState, setStepTransitionState] = useState<"idle" | "out" | "in">("idle");
+  const [beginPressing, setBeginPressing] = useState(false);
+  const [beginEntranceActive, setBeginEntranceActive] = useState(false);
+  const [ringEntranceActive, setRingEntranceActive] = useState(false);
+  const [preparationReveal, setPreparationReveal] = useState<PreparationRevealState>(
+    PREPARATION_REVEAL_BASE,
+  );
   const [journeyDay] = useState(() => {
     if (typeof window === "undefined") {
       return 1;
@@ -139,6 +172,9 @@ export default function RitualPage() {
   const stepOutRef = useRef<number | null>(null);
   const stepInRef = useRef<number | null>(null);
   const stepIdleRef = useRef<number | null>(null);
+  const beginPressRef = useRef<number | null>(null);
+  const beginRingRef = useRef<number | null>(null);
+  const beginStartRef = useRef<number | null>(null);
   const completionTriggeredRef = useRef(false);
   const { playStart, playTransition } = useRinSfx();
 
@@ -157,9 +193,28 @@ export default function RitualPage() {
   const ritualProgressRatio = Math.min(1, Math.max(0, elapsed / TOTAL_SECONDS));
   const currentStep = STEPS[currentStepIndex];
   const displayedStep = STEPS[displayedStepIndex];
-  const displayedInstruction = displayedStep.instruction.replace(/\n+/g, " ");
+  const displayedInstructionParagraphs = useMemo(() => {
+    const lines = displayedStep.instruction
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    if (lines.length <= 2) {
+      return [lines.join(" ")].filter(Boolean);
+    }
+
+    const firstParagraph = lines.slice(0, 2).join(" ");
+    const secondParagraph = lines.slice(2).join(" ");
+    return [firstParagraph, secondParagraph].filter(Boolean);
+  }, [displayedStep.instruction]);
   const isBreatheStep = (currentStep.title || "").toUpperCase().includes("BREATHE");
   const nextActionLabel = NEXT_ACTION_HINTS[currentStepIndex];
+  const isActivePhase = !showPreparation;
+  const ringTimeLabel = showPreparation ? formatTimer(TOTAL_SECONDS) : formatTimer(timer);
+  const ringProgress = showPreparation ? 0.06 : ritualProgressRatio;
+  const ringMode = !showPreparation && isBreatheStep ? "breathe" : "ambient";
+  const ringActive = !showPreparation && running && !paused && timer > 0 && !controlsLocked;
+  const ringPaused = !showPreparation && (paused || controlsLocked);
 
   useEffect(() => {
     if (!isOnboarded()) {
@@ -198,6 +253,36 @@ export default function RitualPage() {
   }, []);
 
   useEffect(() => {
+    if (!showPreparation || prefersReducedMotion) {
+      return;
+    }
+
+    const resetTimer = window.setTimeout(() => {
+      setPreparationReveal(PREPARATION_REVEAL_BASE);
+    }, 0);
+    const cardTimer = window.setTimeout(() => {
+      setPreparationReveal((prev) => ({ ...prev, card: true }));
+    }, PREPARATION_REVEAL_TIMINGS_MS.card);
+    const descriptionTimer = window.setTimeout(() => {
+      setPreparationReveal((prev) => ({ ...prev, description: true }));
+    }, PREPARATION_REVEAL_TIMINGS_MS.description);
+    const ringTimer = window.setTimeout(() => {
+      setPreparationReveal((prev) => ({ ...prev, ring: true }));
+    }, PREPARATION_REVEAL_TIMINGS_MS.ring);
+    const beginTimer = window.setTimeout(() => {
+      setPreparationReveal((prev) => ({ ...prev, begin: true }));
+    }, PREPARATION_REVEAL_TIMINGS_MS.begin);
+
+    return () => {
+      window.clearTimeout(resetTimer);
+      window.clearTimeout(cardTimer);
+      window.clearTimeout(descriptionTimer);
+      window.clearTimeout(ringTimer);
+      window.clearTimeout(beginTimer);
+    };
+  }, [prefersReducedMotion, showPreparation]);
+
+  useEffect(() => {
     return () => {
       if (resetTimerRef.current !== null) {
         window.clearTimeout(resetTimerRef.current);
@@ -216,6 +301,15 @@ export default function RitualPage() {
       }
       if (stepIdleRef.current !== null) {
         window.clearTimeout(stepIdleRef.current);
+      }
+      if (beginPressRef.current !== null) {
+        window.clearTimeout(beginPressRef.current);
+      }
+      if (beginRingRef.current !== null) {
+        window.clearTimeout(beginRingRef.current);
+      }
+      if (beginStartRef.current !== null) {
+        window.clearTimeout(beginStartRef.current);
       }
     };
   }, []);
@@ -290,13 +384,53 @@ export default function RitualPage() {
   }, [countdownValue, playTransition, prefersReducedMotion]);
 
   const handleBeginRitual = () => {
+    if (beginEntranceActive || controlsLocked) {
+      return;
+    }
+
+    const startCountdown = () => {
+      setBeginEntranceActive(false);
+      setBeginPressing(false);
+      setRingEntranceActive(false);
+      setShowPreparation(false);
+      setTimer(TOTAL_SECONDS);
+      setDisplayedStepIndex(0);
+      setStepTransitionState("idle");
+      completionTriggeredRef.current = false;
+      startWithCountdown();
+    };
+
     playStart();
-    setShowPreparation(false);
-    setTimer(TOTAL_SECONDS);
-    setDisplayedStepIndex(0);
-    setStepTransitionState("idle");
-    completionTriggeredRef.current = false;
-    startWithCountdown();
+    if (prefersReducedMotion) {
+      startCountdown();
+      return;
+    }
+
+    setBeginEntranceActive(true);
+    setBeginPressing(true);
+    setRingEntranceActive(false);
+
+    if (beginPressRef.current !== null) {
+      window.clearTimeout(beginPressRef.current);
+    }
+    if (beginRingRef.current !== null) {
+      window.clearTimeout(beginRingRef.current);
+    }
+    if (beginStartRef.current !== null) {
+      window.clearTimeout(beginStartRef.current);
+    }
+
+    beginPressRef.current = window.setTimeout(() => {
+      setBeginPressing(false);
+    }, BEGIN_ENTRANCE_TIMINGS_MS.buttonPress);
+
+    beginRingRef.current = window.setTimeout(() => {
+      setRingEntranceActive(true);
+    }, BEGIN_ENTRANCE_TIMINGS_MS.ringInhaleDelay);
+
+    beginStartRef.current = window.setTimeout(() => {
+      startCountdown();
+    }, BEGIN_ENTRANCE_TIMINGS_MS.startCountdown);
   };
 
   const handlePause = () => {
@@ -396,42 +530,67 @@ export default function RitualPage() {
         isCompleting ? "opacity-0" : "opacity-100"
       }`}
     >
-      <div className="mx-auto flex h-full w-full max-w-md flex-col px-4 pt-3.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        <header className="shrink-0 rounded-xl border border-[var(--rin-gold)]/50 bg-[color:rgba(255,251,241,0.72)] px-3 py-2 text-[10px] tracking-[0.07em] text-[var(--rin-muted)]">
+      <div
+        className={`mx-auto flex h-full w-full max-w-md flex-col px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] ${
+          isActivePhase ? "pt-2.5" : "pt-3.5"
+        }`}
+      >
+        <header
+          className={`shrink-0 rounded-xl border border-[var(--rin-gold)]/50 bg-[color:rgba(255,251,241,0.72)] tracking-[0.07em] text-[var(--rin-muted)] transition-[padding] duration-[680ms] ease-out ${
+            isActivePhase ? "px-2.5 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <p>{todayDisplay}</p>
             <p>Day {journeyDay}/{TOTAL_DAYS}</p>
           </div>
-          <div className="mt-2.5 text-center">
-            <div className="mx-auto max-w-[340px] rounded-xl border border-[var(--rin-gold)]/38 bg-[var(--rin-paper)] px-4 py-2.5 shadow-[0_2px_6px_rgba(0,0,0,0.05)]">
-              <p className="text-[16px] tracking-[0.055em] text-[var(--rin-text)]">
-                Theme：{todaysTheme}
-              </p>
+          {isActivePhase ? (
+            <p className="mt-1.5 text-center text-[11px] tracking-[0.05em] text-[var(--rin-text)]/90">
+              Theme: <span className="text-[var(--rin-text)]">{todaysTheme}</span>
+            </p>
+          ) : (
+            <div
+              className={`rin-prep-reveal mt-2.5 text-center ${
+                preparationReveal.theme ? "is-visible" : ""
+              }`}
+            >
+              <div className="mx-auto max-w-[340px] rounded-xl border border-[var(--rin-gold)]/38 bg-[var(--rin-paper)] px-4 py-2.5 shadow-[0_2px_6px_rgba(0,0,0,0.05)]">
+                <p className="text-[16px] tracking-[0.055em] text-[var(--rin-text)]">
+                  Theme：{todaysTheme}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </header>
 
-        <section className="flex flex-1 min-h-0 flex-col items-center justify-center px-2 py-2">
-          {showPreparation ? (
-            <div className="w-full text-center">
-              <p className="text-[10px] tracking-[0.22em] text-[var(--rin-muted)]">QUIET GIFT</p>
-              <article className="rin-quiet-gift-sheet mx-auto mt-3 w-full max-w-[22.5rem] px-5 py-6 text-center">
-                <p className="rin-quiet-gift-quote text-xs leading-[1.55] italic text-[var(--rin-muted)]/78">
-                  “{INTRO_QUOTE.english}”
+        <section className="flex flex-1 min-h-0 flex-col items-center justify-center px-1.5 py-1.5">
+          <div className="flex w-full flex-1 min-h-0 flex-col items-center justify-center text-center">
+            {showPreparation ? (
+              <div className="w-full text-center">
+                <div className={`rin-prep-reveal ${preparationReveal.card ? "is-visible" : ""}`}>
+                  <p className="text-[10px] tracking-[0.22em] text-[var(--rin-muted)]">QUIET GIFT</p>
+                  <article className="rin-quiet-gift-sheet mx-auto mt-2.5 w-full max-w-[22.25rem] px-4 py-4 text-center">
+                    <p className="rin-quiet-gift-quote text-[11px] leading-[1.55] italic text-[var(--rin-muted)]/78">
+                      “{INTRO_QUOTE.english}”
+                    </p>
+                    <p className="mt-2.5 text-[0.97rem] leading-[1.78] text-[var(--rin-text)]">
+                      「{INTRO_QUOTE.japanese}」
+                    </p>
+                    <p className="mt-2.5 text-[10.5px] leading-relaxed text-[var(--rin-muted)]">
+                      {INTRO_QUOTE.author}{" "}
+                      <span className="text-[10px] text-[var(--rin-muted)]/82">（{INTRO_QUOTE.role}）</span>
+                    </p>
+                  </article>
+                </div>
+                <p
+                  className={`rin-prep-reveal mt-2.5 whitespace-pre-line text-[10.5px] leading-[1.6] tracking-[0.035em] text-[var(--rin-muted)]/90 ${
+                    preparationReveal.description ? "is-visible" : ""
+                  }`}
+                >
+                  {"香水でも、お茶でも。\n落ち着く香りをそっと手元に。準備できたらBEGIN。"}
                 </p>
-                <p className="mt-3 text-[1.03rem] leading-[1.8] text-[var(--rin-text)]">
-                  「{INTRO_QUOTE.japanese}」
-                </p>
-                <p className="mt-3 text-[11px] leading-relaxed text-[var(--rin-muted)]">
-                  {INTRO_QUOTE.author} <span className="text-[10px] text-[var(--rin-muted)]/82">（{INTRO_QUOTE.role}）</span>
-                </p>
-              </article>
-              <p className="mt-2.5 whitespace-pre-line text-[11px] leading-[1.65] tracking-[0.04em] text-[var(--rin-muted)]/90">
-                {"この言葉を合図に、呼吸と“香り”で朝を整えます。\n香水をひと押し。コーヒーでも、お茶でも。\nあなたが落ち着く香りをそっと手元に。準備できたらBEGIN。"}
-              </p>
-            </div>
-          ) : (
-            <div className="flex w-full flex-1 min-h-0 flex-col items-center justify-center text-center">
+              </div>
+            ) : (
               <div
                 className={`rin-step-shell w-full ${
                   stepTransitionState === "out"
@@ -447,27 +606,41 @@ export default function RitualPage() {
                 <p className="rin-step-label mt-1 text-[10px] tracking-[0.2em] text-[var(--rin-muted)]">
                   {displayedStep.title}
                 </p>
-                <p className="rin-ritual-copy mx-auto mt-2.5 text-[var(--rin-text)]">
-                  {displayedInstruction}
-                </p>
+                <div className="rin-ritual-copy-stack mx-auto mt-2.5">
+                  {displayedInstructionParagraphs.map((paragraph, index) => (
+                    <p key={`${displayedStep.title}-${index}`} className="rin-ritual-copy text-[var(--rin-text)]">
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
               </div>
-              <div className="relative z-[2] mt-3.5 flex min-h-[12.5rem] items-center justify-center">
-                <BreathRing
-                  timeLabel={formatTimer(timer)}
-                  countdownValue={countdownValue}
-                  progress={ritualProgressRatio}
-                  mode={isBreatheStep ? "breathe" : "ambient"}
-                  active={running && !paused && timer > 0 && !controlsLocked}
-                  paused={paused || controlsLocked}
-                />
-              </div>
+            )}
+            <div
+              className={`rin-ring-stage relative z-[2] flex min-h-[12.1rem] items-center justify-center ${
+                showPreparation
+                  ? `is-preparation rin-prep-reveal mt-2.5 ${
+                      preparationReveal.ring ? "is-visible" : ""
+                    } ${ringEntranceActive ? "is-entrance" : ""}`
+                  : "mt-3"
+              }`}
+            >
+              <BreathRing
+                timeLabel={ringTimeLabel}
+                countdownValue={showPreparation ? null : countdownValue}
+                progress={ringProgress}
+                mode={ringMode}
+                active={ringActive}
+                paused={ringPaused}
+              />
             </div>
-          )}
+          </div>
         </section>
 
-        <footer className="shrink-0 pt-1">
+        <footer className={`shrink-0 ${isActivePhase ? "pt-0.5" : "pt-1"}`}>
           <section
-            className={`mx-auto w-full max-w-[22.5rem] rounded-2xl border border-[var(--rin-gold)]/60 bg-[color:rgba(251,247,236,0.86)] p-3 shadow-sm transition-[opacity,transform,filter] duration-[2000ms] ease-out ${
+            className={`mx-auto w-full max-w-[22.5rem] border border-[var(--rin-gold)]/60 bg-[color:rgba(251,247,236,0.86)] shadow-sm transition-[opacity,transform,filter,padding,border-radius] duration-[1200ms] ease-out ${
+              isActivePhase ? "rounded-xl p-2.5" : "rounded-2xl p-3"
+            } ${
               resetting ? "rin-resetting" : ""
             }`}
           >
@@ -479,23 +652,37 @@ export default function RitualPage() {
               } ${prefersReducedMotion ? "duration-0" : "duration-[600ms]"}`}
             >
               <p
-                className={`text-center text-[11px] tracking-[0.04em] text-[var(--rin-muted)]/90 transition-opacity duration-[1200ms] ${
+                className={`text-center tracking-[0.04em] text-[var(--rin-muted)]/90 transition-opacity duration-[1200ms] ${
+                  isActivePhase ? "text-[10px]" : "text-[11px]"
+                } ${
                   nextActionLabel && !showPreparation ? "opacity-100" : "opacity-0"
                 }`}
               >
                 {nextActionLabel ? `NEXT: ${nextActionLabel}` : ""}
               </p>
 
-              <div className="mt-2.5 flex w-full min-h-[2.25rem] items-center justify-center">
+              <div
+                className={`flex w-full min-h-[2.1rem] items-center justify-center ${
+                  isActivePhase ? "mt-1.5" : "mt-2.5"
+                }`}
+              >
                 {showPreparation ? (
-                  <button
-                    type="button"
-                    onClick={handleBeginRitual}
-                    disabled={controlsLocked}
-                    className="rin-begin-button rounded-full border border-[var(--rin-gold)] px-10 py-2 text-xs tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rin-gold)]/65 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--rin-bg)]"
-                  >
-                    BEGIN
-                  </button>
+                  <div className={`rin-prep-reveal ${preparationReveal.begin ? "is-visible" : ""}`}>
+                    <button
+                      type="button"
+                      onClick={handleBeginRitual}
+                      disabled={
+                        controlsLocked ||
+                        beginEntranceActive ||
+                        (!prefersReducedMotion && !preparationReveal.begin)
+                      }
+                      className={`rin-begin-button rounded-full border border-[var(--rin-gold)] px-7 py-2.5 text-xs tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rin-gold)]/65 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--rin-bg)] ${
+                        beginPressing ? "is-pressing" : ""
+                      }`}
+                    >
+                      BEGIN
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex w-full justify-center">
                     <div className="inline-flex items-center justify-center gap-3">
@@ -503,7 +690,9 @@ export default function RitualPage() {
                         type="button"
                         onClick={running ? handlePause : handleResume}
                         disabled={timer === 0 || controlsLocked}
-                        className="rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/45 px-5 py-1.5 text-[11px] tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45"
+                        className={`rounded-full border border-[var(--rin-gold)] bg-[var(--rin-gold-soft)]/45 tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                          isActivePhase ? "px-4 py-1 text-[10px]" : "px-5 py-1.5 text-[11px]"
+                        }`}
                       >
                         {running ? "Pause" : "Resume"}
                       </button>
@@ -511,7 +700,9 @@ export default function RitualPage() {
                         type="button"
                         onClick={handleReset}
                         disabled={controlsLocked}
-                        className="rounded-full border border-[var(--rin-gold)] px-5 py-1.5 text-[11px] tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45"
+                        className={`rounded-full border border-[var(--rin-gold)] tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                          isActivePhase ? "px-4 py-1 text-[10px]" : "px-5 py-1.5 text-[11px]"
+                        }`}
                       >
                         Reset
                       </button>
